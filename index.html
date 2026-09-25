@@ -880,25 +880,47 @@ button.ghost{border-color:transparent;background:none;color:var(--dim)}
   (() => {
     const B = { x: 1110, y: 50, w: 430, h: 410, band: 22, c0: 250, c1: 560 };
     const WORDS = [
-      { id: 'f1a', t: 0.20, text: 'ㄱ ㅇ ㅇ', size: 120, label: '창의 실금 ① (줄을 조금)' },
-      { id: 'f1b', t: 0.55, text: '성냥갑을 보세요', size: 58, label: '창의 실금 ② (줄을 반쯤)' },
-      { id: 'f1c', t: 0.87, text: '열한 시', size: 104, label: '창의 실금 ③ (줄을 거의 끝까지)' },
+      { id: 'f1a', t: 0.20, text: 'ㄱ ㅇ ㅇ', lines: ['ㄱㅇㅇ'], tight: 26, size: 200, dx: -30, label: '창의 실금 ① (줄을 조금)' },
+      { id: 'f1b', t: 0.55, text: '성냥갑을 보세요', lines: ['성냥갑을', '보세요'], size: 96, dx: -30, label: '창의 실금 ② (줄을 반쯤)' },
+      { id: 'f1c', t: 0.87, text: '열한 시', lines: ['열한 시'], size: 124, dx: -30, label: '창의 실금 ③ (줄을 거의 끝까지)' },
     ];
     let s = 7; const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
     WORDS.forEach(w => { w.sh = []; for (let i = 0; i < 40; i++) w.sh.push((r() - 0.5) * 520); });
     const phase = g => clamp((g.objById('cord').y - B.c0) / (B.c1 - B.c0), 0, 1);
-    let tmp = null;
+    const lm = {};
+    // 여러 줄 글씨를 한 장의 마스크로 (줄마다 가운데 맞춤)
+    const lineMask = w => { const k = w.id + '@' + (A.fontGen || 0); if (lm[k]) return lm[k];
+      const trim = m => { const d = m.getContext('2d').getImageData(0, 0, m.width, m.height).data; let x0 = m.width, x1 = 0; for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) if (d[(y * m.width + x) * 4 + 3] > 20) { if (x < x0) x0 = x; if (x > x1) x1 = x; } return [x0, x1]; };
+      // 자모만 쓴 글(초성)은 글꼴의 넓은 자리폭 대신 획 너비대로 붙여 쓴다
+      const tightLine = (L, i) => { const cs = [...L].map((ch, j) => mask('r1' + w.id + i + '_' + j, ch, w.size, { weight: 700, font: FONT.hand, hand: true, seed: 5 + j * 3 })); const bx = cs.map(trim);
+        const W = bx.reduce((a, [x0, x1]) => a + (x1 - x0 + 1), 0) + w.tight * (cs.length - 1) + 20; const cv = document.createElement('canvas'); cv.width = W; cv.height = cs[0].height; const x = cv.getContext('2d'); let cx = 10;
+        cs.forEach((m, j) => { const [x0, x1] = bx[j]; x.drawImage(m, cx - x0, 0); cx += x1 - x0 + 1 + w.tight; }); return cv; };
+      const ms = w.lines.map((L, i) => w.tight ? tightLine(L, i) : mask('r1' + w.id + i, L, w.size, { weight: 700, font: FONT.hand, hand: true, seed: 5 + i * 7 }));
+      const lh = w.size * 0.95, W = Math.max(...ms.map(m => m.width)), H = ms[0].height + lh * (ms.length - 1);
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = Math.ceil(H); const x = cv.getContext('2d');
+      ms.forEach((m, i) => x.drawImage(m, (W - m.width) / 2, i * lh)); return (lm[k] = cv); };
+    // 흰 획 · 검은 획 · 흐린 그늘을 미리 한 번만 그려 둔다 (매 프레임 필터를 쓰지 않게)
+    const ly = {}; const layers = w => { const k = w.id + '@' + (A.fontGen || 0); if (ly[k]) return ly[k];
+      const m = lineMask(w), mk = () => { const cv = document.createElement('canvas'); cv.width = B.w; cv.height = B.h; return cv; };
+      const lite = mk(), lx = lite.getContext('2d'); const mx = B.w / 2 - m.width / 2 + (w.dx || 0), my = B.h / 2 - m.height / 2 + (w.dy || 0);
+      // 긁힌 홈은 굵게: 같은 글자를 둘레로 여러 번 찍어 획을 두껍게 한다
+      for (const [ox, oy] of [[0, 0], [1.6, 0], [-1.6, 0], [0, 1.6], [0, -1.6], [1.1, 1.1], [-1.1, -1.1]]) lx.drawImage(m, mx + ox, my + oy);
+      const dark = mk(), dx = dark.getContext('2d'); dx.filter = 'brightness(0)'; dx.drawImage(lite, 0, 0);
+      const shade = mk(), sx = shade.getContext('2d'); sx.filter = 'brightness(0) blur(6px)'; sx.drawImage(lite, 0, 0);
+      return (ly[k] = { lite, dark, shade }); };
     const scratches = (c, g) => {
       const ph = phase(g); c.save(); c.beginPath(); c.rect(B.x, B.y, B.w, B.h); c.clip();
       if (!P.has('bg-01-office')) { c.fillStyle = '#9d988c'; c.fillRect(B.x, B.y, B.w, B.h); for (let y = B.y; y < B.y + B.h; y += 18) { c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(B.x, y + 10, B.w, 7); } }
-      tmp = tmp || document.createElement('canvas'); tmp.width = B.w; tmp.height = B.h; const t = tmp.getContext('2d');
       for (const w of WORDS) {
-        const m = mask('r1' + w.id, w.text, w.size, { weight: 700, font: FONT.hand, hand: true, seed: 5 });
-        t.clearRect(0, 0, B.w, B.h); t.globalCompositeOperation = 'source-over'; t.globalAlpha = 1; t.drawImage(m, B.w / 2 - m.width / 2, B.h / 2 - m.height / 2);
-        t.globalCompositeOperation = 'destination-out'; t.globalAlpha = 0.6; t.drawImage(m, B.w / 2 - m.width / 2 + 2, B.h / 2 - m.height / 2 + 1.5); t.globalAlpha = 1; t.globalCompositeOperation = 'source-over';
         const off = ph - w.t; const al = clamp(1 - Math.abs(off) / 0.1, 0, 1);
-        // 긁힌 자국: 어두운 그림자 한 번, 밝은 선 한 번 — 밝은 창에서도 읽히게
-        for (const [dx, dy, a, comp] of [[2, 2, 0.35 + 0.35 * al, 'dark'], [0, 0, 0.5 + 0.45 * al, 'lite']]) { let i = 0; c.globalAlpha = a; if (comp === 'dark') c.filter = 'brightness(0)'; for (let y = 0; y < B.h; y += B.band) { c.drawImage(tmp, 0, y, B.w, B.band, B.x + off * w.sh[i++ % 40] + dx, B.y + y + dy, B.w, B.band); } c.filter = 'none'; }
+        if (al <= 0 && Math.abs(off) > 0.35) continue; // 멀리 어긋난 글은 거의 안 보인다
+        const L = layers(w);
+        const base = 0.06 * (1 - al);
+        // 어두운 그늘(홈의 그림자)이 흐린 유리를 누르고, 그 위에 빛을 받은 흰 획
+        for (const [img, dx, dy, a] of [[L.shade, 0, 0, base + 0.55 * al], [L.dark, 2.5, 2.5, base + 0.9 * al], [L.lite, 0, 0, base + 0.95 * al]]) {
+          if (a < 0.01) continue; let i = 0; c.globalAlpha = a;
+          for (let y = 0; y < B.h; y += B.band) { c.drawImage(img, 0, y, B.w, B.band, B.x + off * w.sh[i++ % 40] + dx, B.y + y + dy, B.w, B.band); }
+        }
       }
       c.globalAlpha = 1; c.restore();
       const cord = g.objById('cord'); c.strokeStyle = '#cfc9b9'; c.lineWidth = 3; c.beginPath(); c.moveTo(cord.x, 60); c.lineTo(cord.x, cord.y - 30); c.stroke();
