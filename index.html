@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0f1012">
+<title>안개등 — 등대지기가 남긴 서른 개의 암호</title>
+<meta name="description" content="사물을 빛에 겹쳐 글자를 찾고, 등대지기가 남긴 서른 개의 암호를 해독하는 퍼즐 게임.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1012; --bg2:#16181b; --panel:#1b1d21; --line:#2a2d33; --ink:#d8d5cf; --ink2:#8f8c86; --ink3:#5a5852;
+  --amber:#e8a94a; --amber2:#f6c976; --amber-dim:rgba(232,169,74,.18); --danger:#c46a5a;
+  --font:'Gowun Batang','Noto Serif KR','Apple SD Gothic Neo','Malgun Gothic',serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font);letter-spacing:.01em;font-size:15px}
+body{position:fixed;inset:0;width:100%;height:100dvh}
+button{font-family:inherit;color:inherit;background:none;border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;letter-spacing:.06em;font-size:13px;line-height:1.2}
+button:active{transform:translateY(1px)}
+button:disabled{opacity:.3;cursor:default}
+button.primary{border-color:var(--amber);color:var(--amber)}
+button.on{background:var(--amber-dim);border-color:var(--amber);color:var(--amber2)}
+canvas{display:block;image-rendering:pixelated}
+.fog{position:absolute;inset:0;pointer-events:none;background:
+  radial-gradient(ellipse 60% 50% at 20% 110%, rgba(255,255,255,.05), transparent 60%),
+  radial-gradient(ellipse 70% 40% at 80% -10%, rgba(255,255,255,.04), transparent 60%);
+  animation:fogmove 40s ease-in-out infinite alternate}
+@keyframes fogmove{from{transform:translateX(-2%)}to{transform:translateX(2%)}}
+#app{position:absolute;inset:0;display:none;grid-template-rows:44px 1fr;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#app.show{display:grid}
+/* top bar */
+#top{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--bg2)}
+#top .title{font-weight:700;letter-spacing:.2em;color:var(--amber);font-size:15px}
+#top .stage{color:var(--ink2);letter-spacing:.08em;font-size:13px}
+#top .act{color:var(--ink3);font-size:12px;letter-spacing:.12em}
+#top .sp{flex:1}
+#top button{padding:4px 9px;font-size:12px}
+/* main */
+#main{display:grid;grid-template-columns:minmax(200px,27%) 1fr minmax(240px,31%);min-height:0}
+.col{min-height:0;display:flex;flex-direction:column;padding:10px 12px;gap:8px}
+.col h3{margin:0;font-size:11px;letter-spacing:.3em;color:var(--ink3);font-weight:400}
+#shelfCol{border-right:1px solid var(--line)}
+#noteCol{border-left:1px solid var(--line)}
+/* shelf */
+#shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(60px,7.5vw,96px),1fr));gap:6px;align-content:start;overflow:hidden;flex:1;min-height:0}
+.obj{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 2px 4px;border:1px solid transparent;border-radius:8px;cursor:pointer;background:transparent}
+.obj:active{background:var(--bg2)}
+.obj.inA,.obj.inB{border-color:var(--ink3)}
+.obj.kept{border-style:dashed;border-color:var(--amber-dim)}
+.obj .nm{font-size:11px;color:var(--ink2);letter-spacing:.05em;white-space:nowrap}
+.obj.kept .nm{color:var(--amber)}
+.obj canvas{width:clamp(36px,6vh + 1vw,64px);height:clamp(36px,6vh + 1vw,64px)}
+/* bench */
+#benchCol{align-items:center;justify-content:center;gap:8px}
+#board{position:relative;border:1px solid var(--line);border-radius:10px;padding:8px;background:radial-gradient(ellipse at 50% 40%, #1a1a1d, #0f1012 75%)}
+#board canvas{width:min(38vh,300px);height:min(38vh,300px)}
+#board.flash{box-shadow:0 0 40px 6px rgba(232,169,74,.35);border-color:var(--amber)}
+#dots{display:flex;gap:7px;justify-content:center;height:10px}
+#dots i{width:7px;height:7px;border-radius:50%;background:var(--line);display:block;transition:background .2s,box-shadow .2s}
+#dots i.on{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+#slots{display:flex;align-items:center;gap:8px}
+.slot{width:clamp(54px,10vh,84px);height:clamp(54px,10vh,84px);border:1px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative}
+.slot.sel{border-style:solid;border-color:var(--amber)}
+.slot canvas{width:70%;height:70%}
+.slot .lbl{position:absolute;top:2px;left:5px;font-size:10px;color:var(--ink3)}
+.slot .nm{position:absolute;bottom:-16px;left:0;right:0;text-align:center;font-size:10px;color:var(--ink3);white-space:nowrap}
+#opBox{display:flex;flex-direction:column;gap:4px}
+#opBox button{padding:4px 8px;font-size:12px;letter-spacing:.1em}
+#tools{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+#tools button{padding:5px 9px;font-size:12px}
+#keep{margin-top:2px}
+/* note */
+#note{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+#prev{color:var(--ink3);font-size:12px;line-height:1.7;letter-spacing:.03em;word-break:keep-all;max-height:7.5em;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+#prev div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#line{font-size:17px;line-height:2.1;letter-spacing:.06em;word-break:keep-all;color:var(--ink)}
+.syl{display:inline-flex;vertical-align:middle;margin:0 2px;gap:1px;border:1px solid var(--ink3);border-radius:5px;padding:2px 3px;cursor:pointer;height:34px;align-items:center}
+.syl .js{width:16px;height:26px;border-radius:3px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--amber2);line-height:1}
+.syl .js.sel{outline:1px solid var(--amber);background:var(--amber-dim)}
+.syl.ok{border-color:var(--amber)}
+.syl.done{border:none;padding:0;margin:0;color:var(--amber2);font-size:17px;height:auto;display:inline}
+#tray{display:flex;flex-wrap:wrap;gap:5px;min-height:34px;align-content:flex-start}
+.jm{width:30px;height:30px;border:1px solid var(--amber);color:var(--amber2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;background:var(--amber-dim);line-height:1}
+.jm.sel{background:var(--amber);color:#1a1206}
+.jm.new{animation:pop .5s ease}
+@keyframes pop{0%{transform:scale(.4)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+#noteBtns{display:flex;gap:6px;align-items:center}
+#msg{font-size:12px;color:var(--ink2);letter-spacing:.05em;min-height:1.4em;line-height:1.4;word-break:keep-all}
+#msg.bad{color:var(--danger)}
+#msg.good{color:var(--amber)}
+.shake{animation:shake .4s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+/* overlays */
+.ov{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(10,10,12,.92);z-index:20;padding:20px}
+.ov.show{display:flex}
+.card{max-width:640px;width:100%;text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px}
+.card h1{margin:0;font-size:38px;letter-spacing:.5em;color:var(--amber);font-weight:700;text-indent:.5em}
+.card .sub{color:var(--ink2);letter-spacing:.2em;font-size:13px}
+.card p{margin:0;line-height:1.9;letter-spacing:.06em;word-break:keep-all;color:var(--ink);max-width:520px;font-size:15px}
+.card .teach{border:1px solid var(--amber-dim);border-radius:8px;padding:8px 14px;color:var(--amber2);font-size:13px;letter-spacing:.06em;line-height:1.7;word-break:keep-all;max-width:520px}
+.card .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.card button{padding:9px 18px;font-size:14px}
+.card canvas{width:min(60vw,360px);height:auto}
+.card .sceneTitle{font-size:12px;letter-spacing:.4em;color:var(--ink3)}
+#rotate{display:none;position:absolute;inset:0;background:var(--bg);z-index:50;align-items:center;justify-content:center;text-align:center;color:var(--ink2);letter-spacing:.1em;line-height:2;padding:20px;word-break:keep-all}
+@media (orientation:portrait) and (max-width:900px){#rotate{display:flex}}
+#menu .card{gap:10px}
+#menu .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.small{font-size:12px;color:var(--ink3);letter-spacing:.06em}
+@media (max-height:420px){#top{height:38px}#app{grid-template-rows:38px 1fr}#line{font-size:15px}.obj canvas{width:32px;height:32px}.obj{padding:3px 2px 2px}#board canvas{width:min(30vh,200px);height:min(30vh,200px)}.slot{width:54px;height:54px}.card h1{font-size:28px}.card p{font-size:13px}}
+</style>
+</head>
+<body>
+<div class="fog"></div>
+<div id="rotate"><div>안개등은 가로 화면에서 켜집니다.<br><span class="small">기기를 옆으로 돌려 주세요.</span></div></div>
+
+<div id="app">
+  <div id="top">
+    <span class="title">안개등</span>
+    <span class="stage" id="stageLbl"></span>
+    <span class="act" id="actLbl"></span>
+    <span class="sp"></span>
+    <button id="hintBtn">힌트</button>
+    <button id="soundBtn">소리</button>
+    <button id="fsBtn">전체화면</button>
+    <button id="menuBtn">메뉴</button>
+  </div>
+  <div id="main">
+    <div class="col" id="shelfCol"><h3>탁자 위의 물건</h3><div id="shelf"></div></div>
+    <div class="col" id="benchCol">
+      <div id="board"><canvas id="boardCv" width="7" height="7"></canvas></div>
+      <div id="dots"></div>
+      <div id="slots">
+        <div class="slot" id="slotA"><span class="lbl">앞</span><canvas width="7" height="7"></canvas><span class="nm"></span></div>
+        <div id="opBox"></div>
+        <div class="slot" id="slotB"><span class="lbl">뒤</span><canvas width="7" height="7"></canvas><span class="nm"></span></div>
+      </div>
+      <div id="tools"></div>
+    </div>
+    <div class="col" id="noteCol"><h3>등대지기의 일기</h3>
+      <div id="note">
+        <div id="prev"></div>
+        <div id="line"></div>
+        <div id="tray"></div>
+        <div id="noteBtns"><button id="decodeBtn" class="primary">해독</button><button id="clearBtn">비우기</button></div>
+        <div id="msg"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ov show" id="start"><div class="card">
+  <h1>안개등</h1>
+  <div class="sub">등대지기가 남긴 서른 개의 암호</div>
+  <p>폐쇄된 등대에서 일기 한 권이 발견되었다. 글자는 안개에 지워졌고, 탁자 위의 물건들만 남았다.<br>물건을 빛에 겹쳐 보면, 글자가 돌아온다.</p>
+  <div class="btns"><button class="primary" id="startBtn">처음부터</button><button id="contBtn">이어서</button><button id="fsBtn2">전체화면</button></div>
+  <div class="small">소리를 켜고 하기를 권합니다 · 가로 화면</div>
+</div></div>
+
+<div class="ov" id="scene"><div class="card">
+  <div class="sceneTitle" id="sceneTitle"></div>
+  <canvas id="sceneCv"></canvas>
+  <p id="sceneText"></p>
+  <div class="teach" id="sceneTeach"></div>
+  <div class="btns"><button class="primary" id="sceneBtn">계속</button></div>
+</div></div>
+
+<div class="ov" id="menu"><div class="card">
+  <h1 style="font-size:24px">안개등</h1>
+  <div class="small" id="menuInfo"></div>
+  <div class="row"><button id="resumeBtn" class="primary">돌아가기</button><button id="restartStageBtn">이 단계 다시</button><button id="howBtn">규칙</button><button id="resetBtn">처음부터</button></div>
+  <p id="howText" style="display:none;font-size:13px;text-align:left"></p>
+</div></div>
+
+<script>
+window.FOG_OBJECTS = {"창문":[".......",".#####.",".#.#.#.",".#####.",".#.#.#.",".#####.","......."],"액자":["#.....#",".#####.",".#...#.",".#...#.",".#...#.",".#####.","#.....#"],"궤짝":[".......",".#####.",".##.##.",".#...#.",".#...#.",".#####.","......."],"양동이":["..###..",".#...#.",".#...#.",".#####.",".#...#.",".#####.","......."],"책장":[".......",".#####.",".#.....",".#####.",".#.....",".#####.",".#...#."],"컵":[".......",".#####.","##.....","##.....","##.....",".#####.","......."],"낫":[".......",".#####.",".....#.",".....#.",".....#.",".....#.",".....#."],"의자":[".#.....",".#.....",".#.....",".#.....",".#.....",".#####.",".#...#."],"빗장":[".....#.",".#####.",".....#.",".#####.",".....#.",".....#.",".....#."],"굴뚝":[".#.....",".#####.",".....#.",".#####.",".#.....",".#####.",".....#."],"사다리":["..#.#..",".#####.","..#.#..","..#.#..","..#.#..",".#####.","..#.#.."],"창살":[".......",".#####.","..###..","..###..","..###..",".#####.","......."],"서랍":[".......",".#####.",".#....#",".#..#.#",".#....#",".#####.","......."],"문":[".#####.",".#...#.",".#...#.",".#...#.",".#..##.",".#...#.",".#####."],"상자":["#######","#.....#","#.....#","#.....#","#.....#","#.....#","#######"],"그물":["#######","#..#..#","#..#..#","#######","#..#..#","#..#..#","#######"],"반지":["...#...","..###..",".#...#.",".#...#.",".#...#.","..###..","......."],"등불":[".......","..###..",".#...#.",".#.#.#.",".#...#.","..###..",".#####."],"시계":[".......","..###..",".#.#.#.",".#.##..",".#...#.","..###..","......."],"등대":["...#...",".#####.","..###..",".#...#.",".#...#.","..###..",".#...#."],"램프":["..###..",".#####.","..###..",".#...#.",".#...#.","..###..","......."],"자물쇠":["..###..","..#.#..",".#####.",".#...#.",".#.#.#.",".#...#.",".#####."],"산":[".......","...#...","..#.#..","..#.#..",".#...#.",".#...#.","#######"],"천막":[".......","...#...","..#.#..","..#.#..",".#.#.#.",".#.#.#.","......."],"우산":["...#...",".#####.","...#...","..#.#..",".#...#.",".#...#.","...##.."],"정자":[".......",".#####.","...#...","..#.#..",".#...#.",".#...#.",".#...#."],"장승":["...#...",".#####.","...#...","..#.#..",".#...#.",".#...#.",".#...#."],"삼각대":["...#...","...#...","..#.#..","..#.#..",".#...#.",".#...#.","......."],"십자":[".......","...#...","...#...",".#####.","...#...","...#...","......."],"가지":["...#...","...#...","..##...","...#...","..##...","...#...","...#..."],"빗":[".......","...###.","...###.","...###.","...###.","...###.","......."],"깃발":["...#...","...#...",".###...",".###...","...#...","...#...","...#..."],"나뭇가지":["...#...","...#...","...###.","...#...","...###.","...#...","...#..."],"촛대":["...#...","...#...","...#...","...#...",".#####.","...#...","......."],"삽":[".......","..###..","...#...","...#...",".#####.",".#...#.",".#####."],"쌍촛대":["..#.#..","..#.#..","..#.#..","..#.#..",".#####.","...#...","......."],"성벽":[".......","..#.#..","..#.#..","..#.#..",".#####.",".#...#.",".#####."],"철봉":[".......","..#.#..","..#.#..","..###..","..#.#..","..#.#..",".#####."],"그네":["..#.#..","..#.#..","..#.#..","..###..","..#.#..","..#.#..","..#.#.."],"널빤지":[".......",".......",".......","#######",".......",".......","......."],"막대":["...#...","...#...","...#...","...#...","...#...","...#...","...#..."],"기둥":[".#####.","...#...","...#...","...#...","...#...","...#...",".#####."],"못":[".......","...#...","...#...","...#...","...#...",".......","......."],"핀":[".......",".......",".......","...#...","...#...","...#...","......."],"나사":[".......",".####..",".......",".......",".......",".......","......."],"꺾쇠":[".......","....##.",".....#.",".....#.",".....#.",".....#.","......."],"경첩":[".......",".##....",".#.....",".#.....",".#.....",".##....","......."],"선로":[".......","..####.",".......",".......",".......","..####.","......."],"문틀":[".......",".#...#.",".#...#.",".#...#.",".#...#.",".#...#.","......."],"걸쇠":[".......",".......",".......","...###.","...#...","...#...","......."],"받침":[".......",".......",".......","..###..",".......","..###..","......."],"빗살":[".......","..####.",".......","..####.",".......","..####.","......."],"틀":[".......",".#####.",".......",".......",".......",".#####.","......."],"쌍못":[".......","..#.#..","..#.#..","..#.#..","..#.#..","..#.#..","......."],"활":[".......","..###..",".#...#.",".......",".......",".......","......."],"그릇":[".......",".......",".......",".#...#.",".#...#.","..###..","......."],"지붕":[".......","...#...","..#.#..",".......",".......",".......","......."],"다리":[".......",".......",".......","..#.#..",".#...#.",".#...#.","......."],"갓":[".......",".#####.","...#...","..#.#..",".......",".......","......."],"난간":["..#.#..","..#.#..","..#.#..","###.#..","..#.#..","..#.#..","..#.#.."],"이젤":["...#...","..#.#..","..#.#..",".##.#..","..#.#..","..#.#..","...#..."],"우체통":[".......",".#...#.",".#...#.",".#####.",".#...#.",".#####.",".#...#."],"계단":[".......",".#####.",".....#.",".#####.",".#.....",".#####.",".###..."],"갈퀴":[".......","######.",".....#.","######.",".....#.",".....#.","......."],"선반":[".#...#.",".#####.",".#.....",".#####.",".#.....",".#####.","......."],"울타리":[".......",".#####.","..#.#..","#.#.#.#","..#.#..",".#####.","......."],"눈사람":["...#...",".#####.","..###..",".#.#.#.",".#.#.#.","..###..","......."],"풍향계":[".#.#.#.",".#####.","...#...","..#.#..",".#...#.",".#...#.","......."],"깔때기":[".......",".......","#######","...#...","...#...","...#...","...#..."],"버섯":[".......","..###..",".#####.","...#...","...#...","...#...","......."],"종":["...#...","..###..","..#.#..",".#...#.",".#...#.",".#####.","...#..."],"닻":["...#...","..#.#..","...#...",".#.#.#.",".#.#.#.","..###..","...#..."],"배":["...#...","...##..","...###.","...#...","#######",".#####.","..###.."],"달":["..###..",".#.....","#......","#......","#......",".#.....","..###.."],"물고기":[".......","..###..",".#...##","#..#..#",".#...##","..###..","......."],"갈매기":[".......",".......",".#...#.","#.#.#.#",".......",".......","......."],"집":["...#...","..#.#..",".#...#.","#######",".#...#.",".#.#.#.",".#####."],"나무":["...#...","..###..",".#####.","#######","...#...","...#...","...#..."],"톱니":[".#.#.#.","#######",".#...#.","###.###",".#...#.","#######",".#.#.#."],"열쇠":["..###..","..#.#..","..###..","...#...","...#...","...##..","...##.."],"병":["...#...","...#...","..###..","..#.#..","..#.#..","..#.#..","..###.."],"조개":[".......",".......",".#...#.","..#.#..",".#####.","#.....#","......."],"펜":["......#",".....#.","....#..","...#...","..#....",".#.....","#......"],"모자":[".......","..###..","..#.#..","..#.#..","#######",".......","......."]};
+// 안개등 core — 7x7 bitmaps, jamo, objects, ops, recognition.
+// Shared by the offline generator (Node) and the game (browser).
+(function (root) {
+  const N = 7;
+  // bitmap = {hi, lo}: hi = bits for cells 0..27 (rows 0-3), lo = cells 28..48 (rows 4-6)
+  const parse = rows => {
+    let hi = 0, lo = 0;
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      if (rows[r][c] === '#') { const i = r * N + c; if (i < 28) hi |= (1 << i); else lo |= (1 << (i - 28)); }
+    }
+    return { hi: hi >>> 0, lo: lo >>> 0 };
+  };
+  const get = (b, r, c) => { const i = r * N + c; return i < 28 ? (b.hi >>> i) & 1 : (b.lo >>> (i - 28)) & 1; };
+  const fromCells = cells => { // cells: array of 49 0/1
+    let hi = 0, lo = 0;
+    for (let i = 0; i < 49; i++) if (cells[i]) { if (i < 28) hi |= (1 << i); else lo |= (1 << (i - 28)); }
+    return { hi: hi >>> 0, lo: lo >>> 0 };
+  };
+  const toCells = b => { const a = new Array(49); for (let i = 0; i < 49; i++) a[i] = i < 28 ? (b.hi >>> i) & 1 : (b.lo >>> (i - 28)) & 1; return a; };
+  const key = b => b.hi + ',' + b.lo;
+  const eq = (a, b) => a.hi === b.hi && a.lo === b.lo;
+  const isEmpty = b => b.hi === 0 && b.lo === 0;
+  const popcnt = x => { x = x - ((x >>> 1) & 0x55555555); x = (x & 0x33333333) + ((x >>> 2) & 0x33333333); return (((x + (x >>> 4)) & 0x0F0F0F0F) * 0x01010101) >>> 24; };
+  const count = b => popcnt(b.hi) + popcnt(b.lo);
+  const OR = (a, b) => ({ hi: (a.hi | b.hi) >>> 0, lo: (a.lo | b.lo) >>> 0 });
+  const AND = (a, b) => ({ hi: (a.hi & b.hi) >>> 0, lo: (a.lo & b.lo) >>> 0 });
+  const SUB = (a, b) => ({ hi: (a.hi & ~b.hi) >>> 0, lo: (a.lo & ~b.lo) >>> 0 });
+  const OPS = { or: OR, and: AND, sub: SUB };
+  const OP_LIST = ['and', 'or', 'sub'];
+
+  const mapCells = (b, f) => { // f(r,c) -> [r2,c2] or null
+    const cells = new Array(49).fill(0);
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (get(b, r, c)) {
+      const t = f(r, c); if (t && t[0] >= 0 && t[0] < N && t[1] >= 0 && t[1] < N) cells[t[0] * N + t[1]] = 1;
+    }
+    return fromCells(cells);
+  };
+  const rot90 = b => mapCells(b, (r, c) => [c, N - 1 - r]);
+  const flipH = b => mapCells(b, (r, c) => [r, N - 1 - c]);
+  const shift = (b, dr, dc) => mapCells(b, (r, c) => [r + dr, c + dc]);
+  const transform = (b, t) => { // t = {rot:0-3, flip:0/1, dr, dc}
+    let x = b;
+    if (t.flip) x = flipH(x);
+    for (let i = 0; i < (t.rot || 0); i++) x = rot90(x);
+    if (t.dr || t.dc) x = shift(x, t.dr || 0, t.dc || 0);
+    return x;
+  };
+  const bbox = b => {
+    let r0 = 9, r1 = -1, c0 = 9, c1 = -1;
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (get(b, r, c)) { if (r < r0) r0 = r; if (r > r1) r1 = r; if (c < c0) c0 = c; if (c > c1) c1 = c; }
+    return r1 < 0 ? null : { r0, r1, c0, c1 };
+  };
+  const normalize = b => { const bb = bbox(b); return bb ? shift(b, -bb.r0, -bb.c0) : b; };
+
+  // ---- Jamo (7x7 stroke drawings) ----
+  const JAMO_ROWS = {
+    'ㄱ': ['.......', '.#####.', '.....#.', '.....#.', '.....#.', '.....#.', '.......'],
+    'ㄴ': ['.......', '.#.....', '.#.....', '.#.....', '.#.....', '.#####.', '.......'],
+    'ㄷ': ['.......', '.#####.', '.#.....', '.#.....', '.#.....', '.#####.', '.......'],
+    'ㄹ': ['.......', '.#####.', '.....#.', '.#####.', '.#.....', '.#####.', '.......'],
+    'ㅁ': ['.......', '.#####.', '.#...#.', '.#...#.', '.#...#.', '.#####.', '.......'],
+    'ㅂ': ['.......', '.#...#.', '.#...#.', '.#####.', '.#...#.', '.#####.', '.......'],
+    'ㅅ': ['.......', '...#...', '..#.#..', '..#.#..', '.#...#.', '.#...#.', '.......'],
+    'ㅇ': ['.......', '..###..', '.#...#.', '.#...#.', '.#...#.', '..###..', '.......'],
+    'ㅈ': ['.......', '.#####.', '...#...', '..#.#..', '.#...#.', '.#...#.', '.......'],
+    'ㅊ': ['...#...', '.#####.', '...#...', '..#.#..', '.#...#.', '.#...#.', '.......'],
+    'ㅋ': ['.......', '.#####.', '.....#.', '.#####.', '.....#.', '.....#.', '.......'],
+    'ㅌ': ['.......', '.#####.', '.#.....', '.#####.', '.#.....', '.#####.', '.......'],
+    'ㅍ': ['.......', '.#####.', '..#.#..', '..#.#..', '..#.#..', '.#####.', '.......'],
+    'ㅎ': ['...#...', '.#####.', '..###..', '.#...#.', '.#...#.', '..###..', '.......'],
+    'ㅏ': ['.......', '...#...', '...#...', '...###.', '...#...', '...#...', '.......'],
+    'ㅑ': ['.......', '...#...', '...###.', '...#...', '...###.', '...#...', '.......'],
+    'ㅓ': ['.......', '...#...', '...#...', '.###...', '...#...', '...#...', '.......'],
+    'ㅕ': ['.......', '...#...', '.###...', '...#...', '.###...', '...#...', '.......'],
+    'ㅗ': ['.......', '...#...', '...#...', '...#...', '.#####.', '.......', '.......'],
+    'ㅛ': ['.......', '..#.#..', '..#.#..', '..#.#..', '.#####.', '.......', '.......'],
+    'ㅜ': ['.......', '.......', '.#####.', '...#...', '...#...', '...#...', '.......'],
+    'ㅠ': ['.......', '.......', '.#####.', '..#.#..', '..#.#..', '..#.#..', '.......'],
+    'ㅡ': ['.......', '.......', '.......', '.#####.', '.......', '.......', '.......'],
+    'ㅣ': ['.......', '...#...', '...#...', '...#...', '...#...', '...#...', '.......'],
+    'ㅐ': ['.......', '..#.#..', '..#.#..', '..###..', '..#.#..', '..#.#..', '.......'],
+    'ㅔ': ['.......', '..#.#..', '..#.#..', '.##.#..', '..#.#..', '..#.#..', '.......'],
+  };
+  const JAMO = {}; const JAMO_BY_KEY = {};
+  for (const j in JAMO_ROWS) { const b = normalize(parse(JAMO_ROWS[j])); JAMO[j] = b; JAMO_BY_KEY[key(b)] = j; }
+  const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+  const JUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ';
+  const JONG = ['', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+  const CONSONANTS = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ';
+  const VOWELS = 'ㅏㅑㅓㅕㅗㅛㅜㅠㅡㅣㅐㅔ';
+  const decompose = ch => { const code = ch.charCodeAt(0) - 0xAC00; if (code < 0 || code > 11171) return null; const cho = Math.floor(code / 588), jung = Math.floor((code % 588) / 28), jong = code % 28; return [CHO[cho], JUNG[jung], JONG[jong]]; };
+  const compose = (c, v, t) => { const ci = CHO.indexOf(c), vi = JUNG.indexOf(v), ti = t ? JONG.indexOf(t) : 0; if (ci < 0 || vi < 0 || ti < 0) return null; return String.fromCharCode(0xAC00 + ci * 588 + vi * 28 + ti); };
+
+  // recognize: exact jamo match up to translation; returns jamo char or null
+  // all translated instances of every jamo; recognition = exact match against one of them
+  const JAMO_INSTANCES = []; const INST_BY_KEY = {};
+  for (const j in JAMO) { const bb = bbox(JAMO[j]); for (let dr = 0; dr + bb.r1 < N; dr++) for (let dc = 0; dc + bb.c1 < N; dc++) { const b = shift(JAMO[j], dr, dc); JAMO_INSTANCES.push({ j, b }); INST_BY_KEY[key(b)] = j; } }
+  const recognize = b => { if (isEmpty(b)) return null; const n = count(b); if (n < 5 || n > 17) return null; return INST_BY_KEY[b.hi + ',' + b.lo] || null; };
+  // nearest distance (hamming, translation-invariant): min over jamo & shifts
+  const nearest = b => { let best = 99, bj = null; for (const ins of JAMO_INSTANCES) { const d = count({ hi: (b.hi ^ ins.b.hi) >>> 0, lo: (b.lo ^ ins.b.lo) >>> 0 }); if (d < best) { best = d; bj = ins.j; } } return { d: best, j: bj }; };
+
+  // ---- Objects (line-art stencils) ----
+  const OBJECT_ROWS = (typeof module !== 'undefined' && module.exports) ? require('./objects.js') : root.FOG_OBJECTS;
+  const OBJECTS = {}; for (const n in OBJECT_ROWS) OBJECTS[n] = parse(OBJECT_ROWS[n]);
+  const OBJECT_NAMES = Object.keys(OBJECT_ROWS);
+
+  // all transform variants for a toolset
+  const variants = (b, tools) => {
+    const out = []; const seen = new Set();
+    const rots = tools.rot ? [0, 1, 2, 3] : [0];
+    const flips = tools.flip ? [0, 1] : [0];
+    const S = tools.shift ? [-2, -1, 0, 1, 2] : [0];
+    for (const flip of flips) for (const rot of rots) for (const dr of S) for (const dc of S) {
+      const t = { rot, flip, dr, dc }; const x = transform(b, t); if (isEmpty(x) || count(x) !== count(b)) continue; // no clipping: 사물은 판 밖으로 나가지 않는다
+      const k = key(x); if (seen.has(k)) continue; seen.add(k); out.push({ b: x, t });
+    }
+    return out;
+  };
+
+  const api = { N, parse, get, fromCells, toCells, key, eq, isEmpty, count, OR, AND, SUB, OPS, OP_LIST, rot90, flipH, shift, transform, bbox, normalize, JAMO, JAMO_ROWS, JAMO_BY_KEY, CONSONANTS, VOWELS, decompose, compose, recognize, nearest, OBJECT_ROWS, OBJECTS, OBJECT_NAMES, variants };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FogCore = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+window.FOG_DATA = { acts: [null,{"ops":["and"],"rot":0,"flip":0,"shift":0,"chain":0},{"ops":["and"],"rot":1,"flip":0,"shift":0,"chain":0},{"ops":["and","or"],"rot":1,"flip":0,"shift":0,"chain":0},{"ops":["and","or","sub"],"rot":1,"flip":1,"shift":0,"chain":0},{"ops":["and","or","sub"],"rot":1,"flip":1,"shift":0,"chain":1},{"ops":["and","or","sub"],"rot":1,"flip":1,"shift":1,"chain":1}], levels: [{"n":1,"act":1,"segs":[{"t":"안개가 "},{"blank":0},{"blank":1},{"t":"를 삼켰다."}],"blanks":[{"ch":"바","c":"ㅂ","v":"ㅏ","t":""},{"ch":"다","c":"ㄷ","v":"ㅏ","t":""}],"req":["ㅂ","ㅏ","ㄷ"],"objects":["창문","컵","십자","양동이","빗"],"recipes":{"ㅂ":{"j":"ㅂ","a":"창문","b":"양동이","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"십자","b":"빗","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄷ":{"j":"ㄷ","a":"창문","b":"컵","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}},{"n":2,"act":1,"segs":[{"t":"배는 오지 않았다. "},{"blank":0},{"t":" 한 마리만 돌아왔다."}],"blanks":[{"ch":"새","c":"ㅅ","v":"ㅐ","t":""}],"req":["ㅅ","ㅐ"],"objects":["산","창살","천막","그네","울타리"],"recipes":{"ㅅ":{"j":"ㅅ","a":"산","b":"천막","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅐ":{"j":"ㅐ","a":"창살","b":"그네","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}},{"n":3,"act":1,"segs":[{"t":"기름은 "},{"blank":0},{"t":" 통. 그다음은 "},{"blank":1},{"t":"빛뿐이다."}],"blanks":[{"ch":"세","c":"ㅅ","v":"ㅔ","t":""},{"ch":"달","c":"ㄷ","v":"ㅏ","t":"ㄹ"}],"req":["ㅅ","ㅔ","ㄷ","ㅏ","ㄹ"],"objects":["삼각대","십자","창문","굴뚝","난간","컵","천막","빗","이젤"],"recipes":{"ㅅ":{"j":"ㅅ","a":"천막","b":"삼각대","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅔ":{"j":"ㅔ","a":"난간","b":"이젤","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄷ":{"j":"ㄷ","a":"창문","b":"컵","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"십자","b":"빗","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"창문","b":"굴뚝","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}},{"n":4,"act":1,"segs":[{"t":"밤마다 바위 아래서 "},{"blank":0},{"blank":1},{"t":"가 난다."}],"blanks":[{"ch":"소","c":"ㅅ","v":"ㅗ","t":""},{"ch":"리","c":"ㄹ","v":"ㅣ","t":""}],"req":["ㅅ","ㅗ","ㄹ","ㅣ"],"objects":["막대","창문","삽","삼각대","계단","촛대","천막","낫"],"recipes":{"ㅅ":{"j":"ㅅ","a":"천막","b":"삼각대","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅗ":{"j":"ㅗ","a":"촛대","b":"삽","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"창문","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅣ":{"j":"ㅣ","a":"창문","b":"막대","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}},{"n":5,"act":1,"segs":[{"t":"나는 그것을 "},{"blank":0},{"blank":1},{"t":"이라고 적었다."}],"blanks":[{"ch":"바","c":"ㅂ","v":"ㅏ","t":""},{"ch":"람","c":"ㄹ","v":"ㅏ","t":"ㅁ"}],"req":["ㅂ","ㅏ","ㄹ","ㅁ"],"objects":["빗","창문","우산","십자","우체통","계단","궤짝"],"recipes":{"ㅂ":{"j":"ㅂ","a":"창문","b":"우체통","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"십자","b":"빗","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"창문","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅁ":{"j":"ㅁ","a":"창문","b":"궤짝","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}},{"n":6,"act":2,"segs":[{"t":"소리는 "},{"blank":0},{"t":" 앞에서 "},{"blank":1},{"t":"춘다."}],"blanks":[{"ch":"문","c":"ㅁ","v":"ㅜ","t":"ㄴ"},{"ch":"멈","c":"ㅁ","v":"ㅓ","t":"ㅁ"}],"req":["ㅁ","ㅜ","ㄴ","ㅓ"],"objects":["궤짝","창살","버섯","삽","선로","낫","빗살"],"recipes":{"ㅁ":{"j":"ㅁ","a":"궤짝","b":"궤짝","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅜ":{"j":"ㅜ","a":"삽","b":"버섯","op":"and","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄴ":{"j":"ㄴ","a":"궤짝","b":"낫","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅓ":{"j":"ㅓ","a":"창살","b":"버섯","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}}}},{"n":7,"act":2,"segs":[{"t":"창문에 젖은 "},{"blank":0},{"t":"자국이 "},{"blank":1},{"blank":2},{"t":" 있었다."}],"blanks":[{"ch":"손","c":"ㅅ","v":"ㅗ","t":"ㄴ"},{"ch":"남","c":"ㄴ","v":"ㅏ","t":"ㅁ"},{"ch":"아","c":"ㅇ","v":"ㅏ","t":""}],"req":["ㅅ","ㅗ","ㄴ","ㅏ","ㅁ","ㅇ"],"objects":["버섯","궤짝","반지","낫","산","그네","삽","삼각대"],"recipes":{"ㅅ":{"j":"ㅅ","a":"산","b":"삼각대","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅗ":{"j":"ㅗ","a":"삽","b":"버섯","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㄴ":{"j":"ㄴ","a":"궤짝","b":"낫","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"삽","b":"그네","op":"and","ta":{"rot":1,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅁ":{"j":"ㅁ","a":"궤짝","b":"궤짝","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅇ":{"j":"ㅇ","a":"궤짝","b":"반지","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}},{"n":8,"act":2,"segs":[{"t":"나는 열쇠를 "},{"blank":0},{"blank":1},{"t":" 속에 "},{"blank":2},{"t":"었다."}],"blanks":[{"ch":"모","c":"ㅁ","v":"ㅗ","t":""},{"ch":"래","c":"ㄹ","v":"ㅐ","t":""},{"ch":"묻","c":"ㅁ","v":"ㅜ","t":"ㄷ"}],"req":["ㅁ","ㅗ","ㄹ","ㅐ","ㅜ","ㄷ"],"objects":["철봉","의자","궤짝","깔때기","상자","계단","삽","우체통"],"recipes":{"ㅁ":{"j":"ㅁ","a":"궤짝","b":"궤짝","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅗ":{"j":"ㅗ","a":"삽","b":"깔때기","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"계단","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅐ":{"j":"ㅐ","a":"철봉","b":"철봉","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅜ":{"j":"ㅜ","a":"삽","b":"깔때기","op":"and","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄷ":{"j":"ㄷ","a":"궤짝","b":"우체통","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}}}},{"n":9,"act":2,"segs":[{"t":"불빛이 "},{"blank":0},{"t":"해지면 소리는 "},{"blank":1},{"t":" "},{"blank":2},{"t":"까워진다."}],"blanks":[{"ch":"약","c":"ㅇ","v":"ㅑ","t":"ㄱ"},{"ch":"더","c":"ㄷ","v":"ㅓ","t":""},{"ch":"가","c":"ㄱ","v":"ㅏ","t":""}],"req":["ㅇ","ㅑ","ㄱ","ㄷ","ㅓ","ㅏ"],"objects":["반지","창살","서랍","쌍촛대","의자","삽","철봉","우체통","걸쇠"],"recipes":{"ㅇ":{"j":"ㅇ","a":"반지","b":"반지","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅑ":{"j":"ㅑ","a":"창살","b":"쌍촛대","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㄱ":{"j":"ㄱ","a":"의자","b":"서랍","op":"and","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㄷ":{"j":"ㄷ","a":"서랍","b":"우체통","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅓ":{"j":"ㅓ","a":"삽","b":"철봉","op":"and","ta":{"rot":3,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"삽","b":"철봉","op":"and","ta":{"rot":1,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}},{"n":10,"act":2,"segs":[{"t":"그래서 나는 "},{"blank":0},{"blank":1},{"t":" 곁에 남기로 했다."}],"blanks":[{"ch":"등","c":"ㄷ","v":"ㅡ","t":"ㅇ"},{"ch":"불","c":"ㅂ","v":"ㅜ","t":"ㄹ"}],"req":["ㄷ","ㅡ","ㅇ","ㅂ","ㅜ","ㄹ"],"objects":["틀","버섯","반지","양동이","삽","우체통","서랍","의자","계단"],"recipes":{"ㄷ":{"j":"ㄷ","a":"서랍","b":"우체통","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅡ":{"j":"ㅡ","a":"의자","b":"의자","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㅇ":{"j":"ㅇ","a":"반지","b":"반지","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅂ":{"j":"ㅂ","a":"양동이","b":"우체통","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅜ":{"j":"ㅜ","a":"삽","b":"버섯","op":"and","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"계단","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}}}},{"n":11,"act":3,"segs":[{"t":"아침, 계단에 젖은 "},{"blank":0},{"blank":1},{"blank":2},{"t":"이 있었다."}],"blanks":[{"ch":"발","c":"ㅂ","v":"ㅏ","t":"ㄹ"},{"ch":"자","c":"ㅈ","v":"ㅏ","t":""},{"ch":"국","c":"ㄱ","v":"ㅜ","t":"ㄱ"}],"req":["ㅂ","ㅏ","ㄹ","ㅈ","ㄱ","ㅜ"],"objects":["장승","우체통","창문","버섯","계단","삽","낫","걸쇠"],"recipes":{"ㅂ":{"j":"ㅂ","a":"창문","b":"우체통","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"창문","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅈ":{"j":"ㅈ","a":"창문","b":"장승","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄱ":{"j":"ㄱ","a":"창문","b":"낫","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅜ":{"j":"ㅜ","a":"삽","b":"버섯","op":"and","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}},{"n":12,"act":3,"segs":[{"blank":0},{"blank":1},{"t":" 발자국은 등불 앞에서 "},{"blank":2},{"blank":3},{"t":"졌다."}],"blanks":[{"ch":"젖","c":"ㅈ","v":"ㅓ","t":"ㅈ"},{"ch":"은","c":"ㅇ","v":"ㅡ","t":"ㄴ"},{"ch":"사","c":"ㅅ","v":"ㅏ","t":""},{"ch":"라","c":"ㄹ","v":"ㅏ","t":""}],"req":["ㅈ","ㅓ","ㅇ","ㅡ","ㄴ","ㅅ","ㅏ","ㄹ"],"objects":["걸쇠","계단","천막","창문","틀","장승","그릇","낫","산"],"recipes":{"ㅈ":{"j":"ㅈ","a":"창문","b":"장승","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅓ":{"j":"ㅓ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":1,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅇ":{"j":"ㅇ","a":"그릇","b":"그릇","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅡ":{"j":"ㅡ","a":"낫","b":"낫","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㄴ":{"j":"ㄴ","a":"창문","b":"낫","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅅ":{"j":"ㅅ","a":"산","b":"천막","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"창문","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}},{"n":13,"act":3,"segs":[{"blank":0},{"blank":1},{"t":" 속의 내가 "},{"blank":2},{"blank":3},{"t":" 웃었다."}],"blanks":[{"ch":"거","c":"ㄱ","v":"ㅓ","t":""},{"ch":"울","c":"ㅇ","v":"ㅜ","t":"ㄹ"},{"ch":"먼","c":"ㅁ","v":"ㅓ","t":"ㄴ"},{"ch":"저","c":"ㅈ","v":"ㅓ","t":""}],"req":["ㄱ","ㅓ","ㅇ","ㅜ","ㄹ","ㅁ","ㄴ","ㅈ"],"objects":["걸쇠","창문","버섯","의자","풍향계","삽","문틀","계단","그릇"],"recipes":{"ㄱ":{"j":"ㄱ","a":"창문","b":"의자","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅓ":{"j":"ㅓ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":1,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅇ":{"j":"ㅇ","a":"그릇","b":"그릇","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅜ":{"j":"ㅜ","a":"삽","b":"버섯","op":"and","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"창문","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅁ":{"j":"ㅁ","a":"문틀","b":"문틀","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㄴ":{"j":"ㄴ","a":"창문","b":"의자","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅈ":{"j":"ㅈ","a":"창문","b":"풍향계","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}},{"n":14,"act":3,"segs":[{"t":"나는 "},{"blank":0},{"blank":1},{"t":"을 "},{"blank":2},{"t":"지 않기로 했다."}],"blanks":[{"ch":"시","c":"ㅅ","v":"ㅣ","t":""},{"ch":"간","c":"ㄱ","v":"ㅏ","t":"ㄴ"},{"ch":"세","c":"ㅅ","v":"ㅔ","t":""}],"req":["ㅅ","ㅣ","ㄱ","ㅏ","ㄴ","ㅔ"],"objects":["나사","틀","산","걸쇠","기둥","십자","지붕","삼각대","꺾쇠","쌍못"],"recipes":{"ㅅ":{"j":"ㅅ","a":"산","b":"삼각대","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅣ":{"j":"ㅣ","a":"십자","b":"기둥","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄱ":{"j":"ㄱ","a":"나사","b":"꺾쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㄴ":{"j":"ㄴ","a":"나사","b":"꺾쇠","op":"or","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅔ":{"j":"ㅔ","a":"쌍못","b":"지붕","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}}}},{"n":15,"act":3,"segs":[{"t":"안개 속에서 누군가 내 "},{"blank":0},{"blank":1},{"t":"을 "},{"blank":2},{"blank":3},{"t":"다."}],"blanks":[{"ch":"이","c":"ㅇ","v":"ㅣ","t":""},{"ch":"름","c":"ㄹ","v":"ㅡ","t":"ㅁ"},{"ch":"부","c":"ㅂ","v":"ㅜ","t":""},{"ch":"른","c":"ㄹ","v":"ㅡ","t":"ㄴ"}],"req":["ㅇ","ㅣ","ㄹ","ㅡ","ㅁ","ㅂ","ㅜ","ㄴ"],"objects":["꺾쇠","그릇","나사","삽","촛대","틀","계단","그네","받침","빗살"],"recipes":{"ㅇ":{"j":"ㅇ","a":"그릇","b":"그릇","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅣ":{"j":"ㅣ","a":"꺾쇠","b":"틀","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"계단","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅡ":{"j":"ㅡ","a":"꺾쇠","b":"틀","op":"and","ta":{"rot":1,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅁ":{"j":"ㅁ","a":"틀","b":"틀","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅂ":{"j":"ㅂ","a":"받침","b":"틀","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅜ":{"j":"ㅜ","a":"촛대","b":"삽","op":"and","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㄴ":{"j":"ㄴ","a":"나사","b":"꺾쇠","op":"or","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}}}},{"n":16,"act":4,"segs":[{"t":"서랍에서 내가 쓰지 않은 "},{"blank":0},{"blank":1},{"t":"를 "},{"blank":2},{"t":"아냈다."}],"blanks":[{"ch":"편","c":"ㅍ","v":"ㅕ","t":"ㄴ"},{"ch":"지","c":"ㅈ","v":"ㅣ","t":""},{"ch":"찾","c":"ㅊ","v":"ㅏ","t":"ㅈ"}],"req":["ㅍ","ㅕ","ㄴ","ㅈ","ㅣ","ㅊ","ㅏ"],"objects":["이젤","장승","상자","울타리","나뭇가지","걸쇠","우산","낫","경첩"],"recipes":{"ㅍ":{"j":"ㅍ","a":"울타리","b":"상자","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅕ":{"j":"ㅕ","a":"나뭇가지","b":"상자","op":"sub","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄴ":{"j":"ㄴ","a":"낫","b":"상자","op":"sub","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅈ":{"j":"ㅈ","a":"우산","b":"상자","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅣ":{"j":"ㅣ","a":"우산","b":"경첩","op":"and","ta":{"rot":3,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅊ":{"j":"ㅊ","a":"우산","b":"장승","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}}}},{"n":17,"act":4,"segs":[{"t":"편지의 "},{"blank":0},{"blank":1},{"t":"는 "},{"blank":2},{"t":"의 것이었다."}],"blanks":[{"ch":"필","c":"ㅍ","v":"ㅣ","t":"ㄹ"},{"ch":"체","c":"ㅊ","v":"ㅔ","t":""},{"ch":"나","c":"ㄴ","v":"ㅏ","t":""}],"req":["ㅍ","ㅣ","ㄹ","ㅊ","ㅔ","ㄴ","ㅏ"],"objects":["난간","상자","의자","우산","갈매기","풍향계","깔때기","굴뚝","울타리","걸쇠"],"recipes":{"ㅍ":{"j":"ㅍ","a":"울타리","b":"상자","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅣ":{"j":"ㅣ","a":"의자","b":"의자","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"굴뚝","b":"상자","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅊ":{"j":"ㅊ","a":"우산","b":"풍향계","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅔ":{"j":"ㅔ","a":"난간","b":"상자","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄴ":{"j":"ㄴ","a":"의자","b":"상자","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}}}},{"n":18,"act":4,"segs":[{"blank":0},{"t":"가 온다고, "},{"blank":1},{"t":"을 "},{"blank":2},{"blank":3},{"t":"라고 적혀 있었다."}],"blanks":[{"ch":"배","c":"ㅂ","v":"ㅐ","t":""},{"ch":"빛","c":"ㅂ","v":"ㅣ","t":"ㅊ"},{"ch":"감","c":"ㄱ","v":"ㅏ","t":"ㅁ"},{"ch":"추","c":"ㅊ","v":"ㅜ","t":""}],"req":["ㅂ","ㅐ","ㅣ","ㅊ","ㄱ","ㅏ","ㅁ","ㅜ"],"objects":["그네","양동이","꺾쇠","장승","우산","달","깔때기","걸쇠","창문","궤짝"],"recipes":{"ㅂ":{"j":"ㅂ","a":"창문","b":"양동이","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅐ":{"j":"ㅐ","a":"그네","b":"달","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅣ":{"j":"ㅣ","a":"양동이","b":"꺾쇠","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅊ":{"j":"ㅊ","a":"우산","b":"장승","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄱ":{"j":"ㄱ","a":"꺾쇠","b":"꺾쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":1,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㅁ":{"j":"ㅁ","a":"창문","b":"궤짝","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅜ":{"j":"ㅜ","a":"깔때기","b":"달","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}}}},{"n":19,"act":4,"segs":[{"t":"나는 "},{"blank":0},{"blank":1},{"t":"으로 등불을 "},{"blank":2},{"t":"었다."}],"blanks":[{"ch":"처","c":"ㅊ","v":"ㅓ","t":""},{"ch":"음","c":"ㅇ","v":"ㅡ","t":"ㅁ"},{"ch":"덮","c":"ㄷ","v":"ㅓ","t":"ㅍ"}],"req":["ㅊ","ㅓ","ㅇ","ㅡ","ㅁ","ㄷ","ㅍ"],"objects":["상자","풍향계","우산","깔때기","사다리","반지","걸쇠","궤짝","나사","난간","컵"],"recipes":{"ㅊ":{"j":"ㅊ","a":"우산","b":"풍향계","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅓ":{"j":"ㅓ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":1,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅇ":{"j":"ㅇ","a":"궤짝","b":"반지","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅡ":{"j":"ㅡ","a":"나사","b":"나사","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":1,"dr":0,"dc":0}},"ㅁ":{"j":"ㅁ","a":"궤짝","b":"궤짝","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㄷ":{"j":"ㄷ","a":"궤짝","b":"컵","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅍ":{"j":"ㅍ","a":"사다리","b":"상자","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}},{"n":20,"act":4,"segs":[{"blank":0},{"blank":1},{"t":" 속에서 "},{"blank":2},{"blank":3},{"blank":4},{"t":"가 계단을 올라왔다."}],"blanks":[{"ch":"어","c":"ㅇ","v":"ㅓ","t":""},{"ch":"둠","c":"ㄷ","v":"ㅜ","t":"ㅁ"},{"ch":"발","c":"ㅂ","v":"ㅏ","t":"ㄹ"},{"ch":"소","c":"ㅅ","v":"ㅗ","t":""},{"ch":"리","c":"ㄹ","v":"ㅣ","t":""}],"req":["ㅇ","ㅓ","ㄷ","ㅜ","ㅁ","ㅂ","ㅏ","ㄹ","ㅅ","ㅗ","ㅣ"],"objects":["굴뚝","상자","산","나사","반지","우체통","조개","낫","계단","버섯","틀"],"recipes":{"ㅇ":{"j":"ㅇ","a":"반지","b":"반지","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅓ":{"j":"ㅓ","a":"버섯","b":"틀","op":"sub","ta":{"rot":1,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㄷ":{"j":"ㄷ","a":"나사","b":"틀","op":"or","ta":{"rot":3,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅜ":{"j":"ㅜ","a":"버섯","b":"나사","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅁ":{"j":"ㅁ","a":"틀","b":"틀","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅂ":{"j":"ㅂ","a":"우체통","b":"상자","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"버섯","b":"틀","op":"sub","ta":{"rot":3,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"굴뚝","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅅ":{"j":"ㅅ","a":"산","b":"상자","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅗ":{"j":"ㅗ","a":"버섯","b":"나사","op":"sub","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅣ":{"j":"ㅣ","a":"낫","b":"낫","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}}}},{"n":21,"act":5,"segs":[{"t":"그는 "},{"blank":0},{"t":"와 같은 "},{"blank":1},{"blank":2},{"t":"을 하고 있었다."}],"blanks":[{"ch":"나","c":"ㄴ","v":"ㅏ","t":""},{"ch":"얼","c":"ㅇ","v":"ㅓ","t":"ㄹ"},{"ch":"굴","c":"ㄱ","v":"ㅜ","t":"ㄹ"}],"req":["ㄴ","ㅏ","ㅇ","ㅓ","ㄹ","ㄱ","ㅜ"],"objects":["성벽","걸쇠","반지","활","깃발","계단","의자","촛대","풍향계"],"recipes":{"ㄴ":{"j":"ㄴ","a":"의자","b":"의자","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":1,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㅇ":{"j":"ㅇ","a":"반지","b":"반지","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅓ":{"j":"ㅓ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":1,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"계단","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㄱ":{"j":"ㄱ","a":"의자","b":"의자","op":"and","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":1,"dr":0,"dc":0}},"ㅜ":{"j":"ㅜ","chain":{"b":{"hi":100663296,"lo":131072},"a":"깃발","b2":"촛대","op":"sub","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"c":"걸쇠","op":"or","tc":{"rot":1,"flip":0,"dr":0,"dc":0},"order":0}}},{"n":22,"act":5,"segs":[{"t":"그는 이 등대의 "},{"blank":0},{"blank":1},{"blank":2},{"t":" 등대"},{"blank":3},{"blank":4},{"t":"라고 "},{"blank":5},{"t":"했다."}],"blanks":[{"ch":"마","c":"ㅁ","v":"ㅏ","t":""},{"ch":"지","c":"ㅈ","v":"ㅣ","t":""},{"ch":"막","c":"ㅁ","v":"ㅏ","t":"ㄱ"},{"ch":"지","c":"ㅈ","v":"ㅣ","t":""},{"ch":"기","c":"ㄱ","v":"ㅣ","t":""},{"ch":"말","c":"ㅁ","v":"ㅏ","t":"ㄹ"}],"req":["ㅁ","ㅏ","ㅈ","ㅣ","ㄱ","ㄹ"],"objects":["천막","의자","등대","산","계단","궤짝","창문","장승","걸쇠","눈사람"],"recipes":{"ㅁ":{"j":"ㅁ","a":"창문","b":"궤짝","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㅈ":{"j":"ㅈ","a":"창문","b":"장승","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅣ":{"j":"ㅣ","a":"의자","b":"의자","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㄱ":{"j":"ㄱ","a":"궤짝","b":"의자","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"창문","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}},{"n":23,"act":5,"segs":[{"t":"안개는 "},{"blank":0},{"blank":1},{"t":"을 "},{"blank":2},{"blank":3},{"t":" 자란다고 했다."}],"blanks":[{"ch":"기","c":"ㄱ","v":"ㅣ","t":""},{"ch":"억","c":"ㅇ","v":"ㅓ","t":"ㄱ"},{"ch":"먹","c":"ㅁ","v":"ㅓ","t":"ㄱ"},{"ch":"고","c":"ㄱ","v":"ㅗ","t":""}],"req":["ㄱ","ㅣ","ㅇ","ㅓ","ㅁ","ㅗ"],"objects":["그물","문","틀","서랍","촛대","의자","정자","산","그릇","걸쇠"],"recipes":{"ㄱ":{"j":"ㄱ","a":"의자","b":"서랍","op":"and","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅣ":{"j":"ㅣ","a":"촛대","b":"촛대","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅇ":{"j":"ㅇ","a":"그릇","b":"그릇","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅓ":{"j":"ㅓ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":1,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅁ":{"j":"ㅁ","a":"틀","b":"틀","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅗ":{"j":"ㅗ","chain":{"b":{"hi":71860252,"lo":3584},"a":"서랍","b2":"정자","op":"sub","ta":{"rot":3,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"c":"촛대","op":"sub","tc":{"rot":0,"flip":0,"dr":0,"dc":0},"order":1}}},{"n":24,"act":5,"segs":[{"t":"등불을 "},{"blank":0},{"t":" 사람만이 "},{"blank":1},{"blank":2},{"blank":3},{"t":"를 "},{"blank":4},{"blank":5},{"t":" 수 있다고."}],"blanks":[{"ch":"켠","c":"ㅋ","v":"ㅕ","t":"ㄴ"},{"ch":"이","c":"ㅇ","v":"ㅣ","t":""},{"ch":"야","c":"ㅇ","v":"ㅑ","t":""},{"ch":"기","c":"ㄱ","v":"ㅣ","t":""},{"ch":"남","c":"ㄴ","v":"ㅏ","t":"ㅁ"},{"ch":"길","c":"ㄱ","v":"ㅣ","t":"ㄹ"}],"req":["ㅋ","ㅕ","ㄴ","ㅇ","ㅣ","ㅑ","ㄱ","ㅏ","ㅁ","ㄹ"],"objects":["반지","걸쇠","빗장","나뭇가지","계단","갈퀴","컵","톱니","틀","상자","울타리"],"recipes":{"ㅋ":{"j":"ㅋ","a":"빗장","b":"갈퀴","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅕ":{"j":"ㅕ","a":"나뭇가지","b":"상자","op":"sub","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄴ":{"j":"ㄴ","a":"컵","b":"빗장","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅇ":{"j":"ㅇ","a":"반지","b":"상자","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅣ":{"j":"ㅣ","a":"빗장","b":"나뭇가지","op":"and","ta":{"rot":3,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅑ":{"j":"ㅑ","a":"나뭇가지","b":"상자","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄱ":{"j":"ㄱ","a":"컵","b":"빗장","op":"and","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㅁ":{"j":"ㅁ","a":"틀","b":"틀","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"계단","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}}}},{"n":25,"act":5,"segs":[{"t":"나는 남은 "},{"blank":0},{"blank":1},{"t":"을 "},{"blank":2},{"blank":3},{"t":" "},{"blank":4},{"t":"었다."}],"blanks":[{"ch":"기","c":"ㄱ","v":"ㅣ","t":""},{"ch":"름","c":"ㄹ","v":"ㅡ","t":"ㅁ"},{"ch":"모","c":"ㅁ","v":"ㅗ","t":""},{"ch":"두","c":"ㄷ","v":"ㅜ","t":""},{"ch":"부","c":"ㅂ","v":"ㅜ","t":""}],"req":["ㄱ","ㅣ","ㄹ","ㅡ","ㅁ","ㅗ","ㄷ","ㅜ","ㅂ"],"objects":["빗살","버섯","열쇠","사다리","나사","꺾쇠","받침","굴뚝","틀","풍향계","물고기"],"recipes":{"ㄱ":{"j":"ㄱ","a":"나사","b":"꺾쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅣ":{"j":"ㅣ","a":"굴뚝","b":"꺾쇠","op":"and","ta":{"rot":1,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","chain":{"b":{"hi":88610560,"lo":7426},"a":"굴뚝","b2":"굴뚝","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"c":"빗살","op":"or","tc":{"rot":0,"flip":0,"dr":0,"dc":0},"order":0},"ㅡ":{"j":"ㅡ","a":"굴뚝","b":"꺾쇠","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅁ":{"j":"ㅁ","a":"틀","b":"틀","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅗ":{"j":"ㅗ","a":"버섯","b":"나사","op":"sub","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㄷ":{"j":"ㄷ","a":"나사","b":"틀","op":"or","ta":{"rot":3,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅜ":{"j":"ㅜ","a":"버섯","b":"나사","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅂ":{"j":"ㅂ","a":"받침","b":"틀","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}}}},{"n":26,"act":6,"segs":[{"t":"안개가 "},{"blank":0},{"blank":1},{"t":"는 밤, "},{"blank":2},{"t":"가 "},{"blank":3},{"blank":4},{"t":"왔다."}],"blanks":[{"ch":"걷","c":"ㄱ","v":"ㅓ","t":"ㄷ"},{"ch":"히","c":"ㅎ","v":"ㅣ","t":""},{"ch":"배","c":"ㅂ","v":"ㅐ","t":""},{"ch":"돌","c":"ㄷ","v":"ㅗ","t":"ㄹ"},{"ch":"아","c":"ㅇ","v":"ㅏ","t":""}],"req":["ㄱ","ㅓ","ㄷ","ㅎ","ㅣ","ㅂ","ㅐ","ㅗ","ㄹ","ㅇ","ㅏ"],"objects":["못","걸쇠","반지","등대","계단","나뭇가지","버섯","선로","꺾쇠","갓"],"recipes":{"ㄱ":{"j":"ㄱ","a":"꺾쇠","b":"꺾쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":1,"dr":0,"dc":0}},"ㅓ":{"j":"ㅓ","a":"못","b":"걸쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㄷ":{"j":"ㄷ","a":"꺾쇠","b":"선로","op":"or","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅎ":{"j":"ㅎ","a":"등대","b":"꺾쇠","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":1,"dc":0}},"ㅣ":{"j":"ㅣ","a":"못","b":"못","op":"or","ta":{"rot":0,"flip":0,"dr":-1,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅂ":{"j":"ㅂ","chain":{"b":{"hi":125829120,"lo":7968},"a":"못","b2":"꺾쇠","op":"or","ta":{"rot":1,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"c":"선로","op":"or","tc":{"rot":1,"flip":0,"dr":-1,"dc":0},"order":0},"ㅐ":{"j":"ㅐ","a":"갓","b":"갓","op":"or","ta":{"rot":1,"flip":0,"dr":0,"dc":-2},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㅗ":{"j":"ㅗ","a":"버섯","b":"꺾쇠","op":"sub","ta":{"rot":2,"flip":0,"dr":0,"dc":-1},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"계단","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅇ":{"j":"ㅇ","a":"반지","b":"반지","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"못","b":"걸쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}},{"n":27,"act":6,"segs":[{"blank":0},{"t":" 배가 "},{"blank":1},{"blank":2},{"t":" "},{"blank":3},{"blank":4},{"t":" 멈추었다."}],"blanks":[{"ch":"빈","c":"ㅂ","v":"ㅣ","t":"ㄴ"},{"ch":"등","c":"ㄷ","v":"ㅡ","t":"ㅇ"},{"ch":"대","c":"ㄷ","v":"ㅐ","t":""},{"ch":"아","c":"ㅇ","v":"ㅏ","t":""},{"ch":"래","c":"ㄹ","v":"ㅐ","t":""}],"req":["ㅂ","ㅣ","ㄴ","ㄷ","ㅡ","ㅇ","ㅐ","ㅏ","ㄹ"],"objects":["자물쇠","문틀","그릇","선로","걸쇠","낫","계단","컵","쌍못"],"recipes":{"ㅂ":{"j":"ㅂ","a":"문틀","b":"쌍못","op":"or","ta":{"rot":0,"flip":0,"dr":-1,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅣ":{"j":"ㅣ","a":"문틀","b":"쌍못","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":-1},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄴ":{"j":"ㄴ","a":"컵","b":"낫","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㄷ":{"j":"ㄷ","a":"컵","b":"자물쇠","op":"and","ta":{"rot":0,"flip":0,"dr":1,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅡ":{"j":"ㅡ","a":"낫","b":"낫","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㅇ":{"j":"ㅇ","a":"그릇","b":"그릇","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅐ":{"j":"ㅐ","a":"걸쇠","b":"쌍못","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":-1},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"계단","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}}}},{"n":28,"act":6,"segs":[{"t":"이 "},{"blank":0},{"blank":1},{"t":"를 "},{"blank":2},{"blank":3},{"t":"한 "},{"blank":4},{"blank":5},{"t":"에게."}],"blanks":[{"ch":"일","c":"ㅇ","v":"ㅣ","t":"ㄹ"},{"ch":"기","c":"ㄱ","v":"ㅣ","t":""},{"ch":"해","c":"ㅎ","v":"ㅐ","t":""},{"ch":"독","c":"ㄷ","v":"ㅗ","t":"ㄱ"},{"ch":"사","c":"ㅅ","v":"ㅏ","t":""},{"ch":"람","c":"ㄹ","v":"ㅏ","t":"ㅁ"}],"req":["ㅇ","ㅣ","ㄹ","ㄱ","ㅎ","ㅐ","ㄷ","ㅗ","ㅅ","ㅏ","ㅁ"],"objects":["낫","서랍","등대","쌍못","계단","걸쇠","촛대","등불","천막","궤짝"],"recipes":{"ㅇ":{"j":"ㅇ","a":"궤짝","b":"등불","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅣ":{"j":"ㅣ","a":"촛대","b":"촛대","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":1,"dc":0}},"ㄹ":{"j":"ㄹ","a":"계단","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㄱ":{"j":"ㄱ","a":"궤짝","b":"낫","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅎ":{"j":"ㅎ","a":"등대","b":"낫","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":-1},"tb":{"rot":1,"flip":0,"dr":1,"dc":0}},"ㅐ":{"j":"ㅐ","a":"걸쇠","b":"쌍못","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":-1},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄷ":{"j":"ㄷ","a":"궤짝","b":"서랍","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅗ":{"j":"ㅗ","chain":{"b":{"hi":30376960,"lo":62},"a":"걸쇠","b2":"쌍못","op":"or","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"c":"촛대","op":"and","tc":{"rot":0,"flip":0,"dr":0,"dc":0},"order":0},"ㅅ":{"j":"ㅅ","a":"등대","b":"천막","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":-1,"dc":0}},"ㅏ":{"j":"ㅏ","a":"걸쇠","b":"걸쇠","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㅁ":{"j":"ㅁ","a":"궤짝","b":"궤짝","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}}}},{"n":29,"act":6,"segs":[{"blank":0},{"blank":1},{"t":"은 "},{"blank":2},{"blank":3},{"t":" "},{"blank":4},{"t":"지 않았다."}],"blanks":[{"ch":"등","c":"ㄷ","v":"ㅡ","t":"ㅇ"},{"ch":"불","c":"ㅂ","v":"ㅜ","t":"ㄹ"},{"ch":"아","c":"ㅇ","v":"ㅏ","t":""},{"ch":"직","c":"ㅈ","v":"ㅣ","t":"ㄱ"},{"ch":"식","c":"ㅅ","v":"ㅣ","t":"ㄱ"}],"req":["ㄷ","ㅡ","ㅇ","ㅂ","ㅜ","ㄹ","ㅏ","ㅈ","ㅣ","ㄱ","ㅅ"],"objects":["계단","경첩","낫","천막","버섯","정자","반지","나무","선로","쌍못"],"recipes":{"ㄷ":{"j":"ㄷ","a":"경첩","b":"선로","op":"or","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅡ":{"j":"ㅡ","a":"낫","b":"낫","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"ㅇ":{"j":"ㅇ","a":"반지","b":"반지","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅂ":{"j":"ㅂ","a":"선로","b":"쌍못","op":"or","ta":{"rot":1,"flip":0,"dr":-2,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅜ":{"j":"ㅜ","a":"버섯","b":"낫","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":-1},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄹ":{"j":"ㄹ","a":"계단","b":"계단","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","a":"버섯","b":"선로","op":"sub","ta":{"rot":3,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":0,"dr":0,"dc":0}},"ㅈ":{"j":"ㅈ","a":"정자","b":"천막","op":"sub","ta":{"rot":0,"flip":0,"dr":-1,"dc":0},"tb":{"rot":0,"flip":0,"dr":1,"dc":0}},"ㅣ":{"j":"ㅣ","a":"낫","b":"낫","op":"and","ta":{"rot":0,"flip":0,"dr":-1,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄱ":{"j":"ㄱ","a":"낫","b":"낫","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":1,"flip":1,"dr":0,"dc":0}},"ㅅ":{"j":"ㅅ","a":"천막","b":"반지","op":"sub","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":-1,"dc":0}}}},{"n":30,"act":6,"segs":[{"blank":0},{"blank":1},{"t":" "},{"blank":2},{"blank":3},{"blank":4},{"blank":5},{"t":"는 "},{"blank":6},{"blank":7},{"t":"이다."}],"blanks":[{"ch":"다","c":"ㄷ","v":"ㅏ","t":""},{"ch":"음","c":"ㅇ","v":"ㅡ","t":"ㅁ"},{"ch":"등","c":"ㄷ","v":"ㅡ","t":"ㅇ"},{"ch":"대","c":"ㄷ","v":"ㅐ","t":""},{"ch":"지","c":"ㅈ","v":"ㅣ","t":""},{"ch":"기","c":"ㄱ","v":"ㅣ","t":""},{"ch":"당","c":"ㄷ","v":"ㅏ","t":"ㅇ"},{"ch":"신","c":"ㅅ","v":"ㅣ","t":"ㄴ"}],"req":["ㄷ","ㅏ","ㅇ","ㅡ","ㅁ","ㅐ","ㅈ","ㅣ","ㄱ","ㅅ","ㄴ"],"objects":["지붕","버섯","반지","쌍못","서랍","정자","가지","궤짝","낫","촛대","삼각대"],"recipes":{"ㄷ":{"j":"ㄷ","a":"궤짝","b":"서랍","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅏ":{"j":"ㅏ","chain":{"b":{"hi":42009088,"lo":516},"a":"쌍못","b2":"버섯","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":3,"flip":0,"dr":0,"dc":0}},"c":"지붕","op":"or","tc":{"rot":1,"flip":0,"dr":0,"dc":-2},"order":0},"ㅇ":{"j":"ㅇ","a":"궤짝","b":"반지","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅡ":{"j":"ㅡ","a":"서랍","b":"버섯","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":-1,"dc":0}},"ㅁ":{"j":"ㅁ","a":"궤짝","b":"궤짝","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":2,"flip":0,"dr":0,"dc":0}},"ㅐ":{"j":"ㅐ","a":"쌍못","b":"지붕","op":"or","ta":{"rot":0,"flip":0,"dr":-1,"dc":0},"tb":{"rot":0,"flip":0,"dr":1,"dc":0}},"ㅈ":{"j":"ㅈ","a":"정자","b":"버섯","op":"sub","ta":{"rot":0,"flip":0,"dr":-1,"dc":0},"tb":{"rot":2,"flip":0,"dr":1,"dc":0}},"ㅣ":{"j":"ㅣ","a":"촛대","b":"버섯","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄱ":{"j":"ㄱ","a":"궤짝","b":"낫","op":"and","ta":{"rot":0,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㅅ":{"j":"ㅅ","a":"삼각대","b":"반지","op":"sub","ta":{"rot":0,"flip":0,"dr":1,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}},"ㄴ":{"j":"ㄴ","a":"낫","b":"서랍","op":"and","ta":{"rot":2,"flip":0,"dr":0,"dc":0},"tb":{"rot":0,"flip":0,"dr":0,"dc":0}}}}], story: ["안개가 【바다】를 삼켰다.","배는 오지 않았다. 【새】 한 마리만 돌아왔다.","기름은 【세】 통. 그다음은 【달】빛뿐이다.","밤마다 바위 아래서 【소리】가 난다.","나는 그것을 【바람】이라고 적었다.","소리는 【문】 앞에서 【멈】춘다.","창문에 젖은 【손】자국이 【남아】 있었다.","나는 열쇠를 【모래】 속에 【묻】었다.","불빛이 【약】해지면 소리는 【더】 【가】까워진다.","그래서 나는 【등불】 곁에 남기로 했다.","아침, 계단에 젖은 【발자국】이 있었다.","【젖은】 발자국은 등불 앞에서 【사라】졌다.","【거울】 속의 내가 【먼저】 웃었다.","나는 【시간】을 【세】지 않기로 했다.","안개 속에서 누군가 내 【이름】을 【부른】다.","서랍에서 내가 쓰지 않은 【편지】를 【찾】아냈다.","편지의 【필체】는 【나】의 것이었다.","【배】가 온다고, 【빛】을 【감추】라고 적혀 있었다.","나는 【처음】으로 등불을 【덮】었다.","【어둠】 속에서 【발소리】가 계단을 올라왔다.","그는 【나】와 같은 【얼굴】을 하고 있었다.","그는 이 등대의 【마지막】 등대【지기】라고 【말】했다.","안개는 【기억】을 【먹고】 자란다고 했다.","등불을 【켠】 사람만이 【이야기】를 【남길】 수 있다고.","나는 남은 【기름】을 【모두】 【부】었다.","안개가 【걷히】는 밤, 【배】가 【돌아】왔다.","【빈】 배가 【등대】 【아래】 멈추었다.","이 【일기】를 【해독】한 【사람】에게.","【등불】은 【아직】 【식】지 않았다.","【다음】 【등대지기】는 【당신】이다."], scenes: {"0":{"title":"폐쇄된 등대","lines":["섬의 등대는 삼 년 전에 문을 닫았다.","문은 안에서 잠겨 있었고, 탁자 위에는 물건들과 일기 한 권이 남아 있었다.","일기의 글자는 모두 안개에 지워져 있었다. 물건을 빛에 겹쳐 보면, 글자가 돌아온다."],"teach":"두 사물을 빛판에 올리면 빛은 둘 다 뚫린 곳만 통과한다. 남은 모양이 글자가 되면 노트에 적힌다."},"5":{"title":"소리","lines":["일기의 첫 장은 안개와 함께 끝났다.","등대지기는 매일 밤 같은 소리를 들었다고 적었다. 파도 소리는 아니었다."],"teach":"이제 사물을 돌릴 수 있다. 돌리면 다른 글자가 숨어 있을지 모른다."},"10":{"title":"발자국","lines":["그는 등불 곁을 떠나지 않았다.","그런데 아침마다 계단은 젖어 있었다. 바다에서 올라온 것처럼."],"teach":"부서진 조각들이 나타났다. 겹치기는 두 조각의 모양을 합친다."},"15":{"title":"편지","lines":["등대 안에 그 말고 누군가 있었다.","서랍 깊은 곳에서, 그가 쓴 적 없는 편지가 나왔다."],"teach":"파내기는 앞 사물에서 뒤 사물의 모양을 도려낸다. 뒤집기로 거울에 비춘 모양도 쓸 수 있다."},"20":{"title":"어둠","lines":["그는 처음으로 등불을 덮었다.","어둠 속에서 안개가 등대 안으로 들어왔다. 그리고 계단을 올라왔다."],"teach":"만든 모양을 간직하면 새 사물이 된다. 두 번 겹쳐야 나오는 글자가 있다."},"25":{"title":"이름","lines":["그는 자신과 같은 얼굴을 한 사람과 마주 앉았다.","그 사람은 그가 잊은 이름들을 하나씩 불러 주었다."],"teach":"사물을 한 칸씩 밀 수 있다. 자리가 맞아야 글자가 된다."},"30":{"title":"다음 등대지기","lines":["일기는 여기서 끝난다.","등불은 아직 켜져 있다. 그리고 당신은 이 글자들을 읽을 수 있는 사람이다.","안개가 걷히는 밤이면, 바다 쪽을 보라."]}}, art: {"0":["....................................",".................o..................","................###.................","................#o#.....+...........","................###....+++..........",".................#......+...........","................###.................","................#.#.......++++......","................#.#......++++++.....","...............##.##....++++++++....","...............#...#...++++++++++...","..............##...##.++++++++++++..",".....++....##########################","....++++..#########################.","...++++++############################","####################################"],"5":["....................................","....................................",".................................#..","................................###.","................................#o#.","................................###.",".................................#..",".................o...............#..","................+.+..............#..","...............+...+............###.","..............+..+..+.........######",".............+..+.+..+..............","............+..+...+..+.............","...........+..+.....+..+............","+++++++++++++++++++++++++++++++++++.",".+++++++++++++++++++++++++++++++++++"],"10":["....................................","....................................","....................................",".........................######.....",".........................#..........",".....................o...#..........",".....................####...........",".....................#..............",".................o...#..............",".................####...............",".................#..................",".............o...#..................",".............####...................",".............#......................",".........o...#......................","#############......................."],"15":["....................................","....................................","............................o.......","...........................o.o......","............................o.......","............................#.......","............................#.......",".......################.....#.......",".......##............##....###......",".......#.##........##.#.....#.......",".......#...##....##...#.....#.......",".......#.....####.....#.....#.......",".......#..............#.....#.......",".......################.....#.......","............................#.......","####################################"],"20":["....................................","....................................","....................................","..........#############.............","..........#...........#.............","..........#.....+.....#.............","..........#....+++....#.............","..........#...+++++...#.............","..........#..+++++++..#.............","..........#.+++++++++.#.............","..........#+++++++++++#.............","..........#+++++++++++#........##...","..........#+++++++++++#........#o#..","..........#+++++++++++#........##...","..........#+++++++++++#........#....","####################################"],"25":["....................................","....................................","......####..................####....",".....######................######...",".....######................######...",".....#####..................#####...",".....####....................####...",".....###.........o............###...",".....####.......###..........####...",".....####.......#o#..........####...","....######......###.........######..","...########......#.........########.","..##########.....#........##########","..##########...#####......##########","..##########...#####......##########","####################################"],"30":["..o.................................","....o............o..................","......o.........###..........o......","........o.......#o#.........o.......","..........o.....###.......o.........","............o....#......o...........","..............o.###...o.............","................#.#.................","................#.#.................","...............##.##................","...............#...#................","..............##...##...............",".....++....##########################","....++++..#########################.","...++++++############################","####################################"]} };
+</script>
+<script>
+// 안개등 — 게임 본체
+(function () {
+  const C = window.FogCore, D = window.FOG_DATA;
+  const $ = id => document.getElementById(id);
+  const ACTS = D.acts, LEVELS = D.levels, STORY = D.story, SCENES = D.scenes;
+  const ACT_NAMES = ['', '안개', '소리', '발자국', '편지', '어둠', '이름'];
+  const OP_LABEL = { and: '비추기 ∩', or: '겹치기 ∪', sub: '파내기 −' };
+  const SAVE_KEY = 'foglamp.save.v1';
+
+  // ---------- 저장 ----------
+  let save = { stage: 1, cleared: 0, sound: true, hints: {} };
+  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.stage) save = Object.assign(save, s); } catch (e) { }
+  const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { } };
+
+  // ---------- 소리 (파일 없이 합성) ----------
+  const Snd = (() => {
+    let ctx = null, master = null, drone = null, noteTimer = null, on = save.sound !== false;
+    const ensure = () => { if (ctx) return; ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); master.gain.value = on ? 1 : 0; master.connect(ctx.destination); startDrone(); };
+    const startDrone = () => {
+      const g = ctx.createGain(); g.gain.value = 0.045; g.connect(master);
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220; lp.connect(g);
+      [55, 55.7, 82.4].forEach((f, i) => { const o = ctx.createOscillator(); o.type = i === 2 ? 'triangle' : 'sine'; o.frequency.value = f; const og = ctx.createGain(); og.gain.value = i === 2 ? 0.25 : 1; o.connect(og); og.connect(lp); o.start(); });
+      // 안개 바람: 잡음
+      const len = ctx.sampleRate * 4, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 300; bp.Q.value = 0.6;
+      const ng = ctx.createGain(); ng.gain.value = 0.018; src.connect(bp); bp.connect(ng); ng.connect(master); src.start();
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05; const lg = ctx.createGain(); lg.gain.value = 0.012; lfo.connect(lg); lg.connect(ng.gain); lfo.start();
+      drone = g; scheduleNote();
+    };
+    const NOTES = [110, 130.8, 146.8, 164.8, 196, 220, 261.6];
+    const scheduleNote = () => { noteTimer = setTimeout(() => { if (on) piano(NOTES[Math.floor(Math.random() * NOTES.length)], 0.12, 5); scheduleNote(); }, 7000 + Math.random() * 9000); };
+    const tone = (f, type, t0, dur, vol, dest) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur); o.connect(g); g.connect(dest || master); o.start(t0); o.stop(t0 + dur + 0.05); };
+    const echo = () => { const dl = ctx.createDelay(1.0); dl.delayTime.value = 0.38; const fb = ctx.createGain(); fb.gain.value = 0.35; const wet = ctx.createGain(); wet.gain.value = 0.5; dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(master); return dl; };
+    const piano = (f, vol, dur) => { const t = ctx.currentTime; const e = echo(); const g = ctx.createGain(); g.gain.value = 1; g.connect(master); g.connect(e); tone(f, 'triangle', t, dur, vol, g); tone(f * 2, 'sine', t, dur * 0.6, vol * 0.3, g); tone(f * 3, 'sine', t, dur * 0.3, vol * 0.08, g); };
+    const bell = (f, t, vol, dur) => { const e = echo(); const g = ctx.createGain(); g.gain.value = 1; g.connect(master); g.connect(e); [[1, 1], [2.76, .5], [5.4, .25], [8.9, .1]].forEach(([m, a]) => tone(f * m, 'sine', t, dur / (1 + m * 0.3), vol * a, g)); };
+    const api = {
+      unlock() { ensure(); if (ctx.state === 'suspended') ctx.resume(); },
+      toggle() { on = !on; save.sound = on; persist(); if (ctx) master.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 0.05); return on; },
+      isOn() { return on; },
+      tap() { if (!ctx || !on) return; const t = ctx.currentTime; tone(1800, 'square', t, 0.03, 0.03); },
+      place() { if (!ctx || !on) return; const t = ctx.currentTime; tone(520, 'sine', t, 0.12, 0.08); tone(780, 'sine', t + 0.02, 0.1, 0.04); },
+      op() { if (!ctx || !on) return; const t = ctx.currentTime; tone(330, 'triangle', t, 0.15, 0.06); },
+      found() { if (!ctx || !on) return; const t = ctx.currentTime; bell(880, t, 0.16, 2.2); bell(1318, t + 0.08, 0.1, 1.8); },
+      again() { if (!ctx || !on) return; const t = ctx.currentTime; tone(660, 'sine', t, 0.2, 0.05); },
+      wrong() { if (!ctx || !on) return; const t = ctx.currentTime; tone(72, 'sine', t, 0.5, 0.25); tone(60, 'triangle', t + 0.05, 0.4, 0.12); },
+      clear() { if (!ctx || !on) return; const t = ctx.currentTime; [440, 554, 659, 880, 1108].forEach((f, i) => bell(f, t + i * 0.13, 0.14, 2.5)); },
+      scene() { if (!ctx || !on) return; const t = ctx.currentTime; piano(110, 0.15, 6); tone(55, 'sine', t, 4, 0.12); },
+    };
+    return api;
+  })();
+
+  // ---------- 그리기 ----------
+  const drawBits = (cv, b, opts) => {
+    const o = Object.assign({ on: '#d8d5cf', off: 'rgba(255,255,255,.04)', dim: 1, glow: false }, opts || {});
+    const ctx = cv.getContext('2d'); const S = cv.width; const cell = S / 7; ctx.clearRect(0, 0, S, S);
+    for (let r = 0; r < 7; r++) for (let c = 0; c < 7; c++) {
+      const v = b && C.get(b, r, c);
+      ctx.fillStyle = v ? o.on : o.off; const pad = cell * 0.14;
+      if (o.glow && v) { ctx.shadowColor = o.on; ctx.shadowBlur = cell * 0.6; } else ctx.shadowBlur = 0;
+      ctx.fillRect(c * cell + pad, r * cell + pad, cell - pad * 2, cell - pad * 2);
+    }
+    ctx.shadowBlur = 0;
+  };
+  const prepCanvas = (cv, px) => { cv.width = px; cv.height = px; };
+
+  // ---------- 상태 ----------
+  let L = null, act = null, tools = null;
+  let objects = []; // [{id, name, b, kept}]
+  let slots = [null, null]; // {id, t:{rot,flip,dr,dc}}
+  let selSlot = 0, op = 'and';
+  let found = []; // jamo chars found this stage
+  let fills = []; // per blank: [cho, jung, jong]
+  let selJamo = null, selCell = null; // {bi, k}
+  let keptCount = 0, hintsUsed = 0;
+  let lastResult = null;
+
+  const toolsFor = a => ({ ops: ACTS[a].ops, rot: !!ACTS[a].rot, flip: !!ACTS[a].flip, shift: !!ACTS[a].shift, chain: !!ACTS[a].chain });
+
+  function loadStage(n) {
+    L = LEVELS[n - 1]; act = L.act; tools = toolsFor(act);
+    objects = L.objects.map((name, i) => ({ id: 'o' + i, name, b: C.OBJECTS[name], kept: false }));
+    slots = [null, null]; selSlot = 0; op = tools.ops[0]; found = []; selJamo = null; selCell = null; keptCount = 0; hintsUsed = 0; lastResult = null;
+    fills = L.blanks.map(b => [null, null, b.t ? null : '']);
+    $('stageLbl').textContent = `${n} / 30`;
+    $('actLbl').textContent = `${act}막 · ${ACT_NAMES[act]}`;
+    renderShelf(); renderOps(); renderTools(); renderSlots(); renderBoard(); renderNote(); renderPrev(); setMsg('');
+    save.stage = n; persist();
+  }
+
+  // ---------- 선반 ----------
+  function renderShelf() {
+    const el = $('shelf'); el.innerHTML = '';
+    objects.forEach(o => {
+      const d = document.createElement('div'); d.className = 'obj' + (o.kept ? ' kept' : '');
+      if (slots[0] && slots[0].id === o.id) d.classList.add('inA'); if (slots[1] && slots[1].id === o.id) d.classList.add('inB');
+      const cv = document.createElement('canvas'); prepCanvas(cv, 84); drawBits(cv, o.b, { on: o.kept ? '#e8a94a' : '#cfcac2' });
+      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = o.name;
+      d.appendChild(cv); d.appendChild(nm);
+      d.addEventListener('click', () => { Snd.unlock(); placeObject(o); });
+      el.appendChild(d);
+    });
+  }
+  function placeObject(o) {
+    let k = selSlot; if (slots[0] && !slots[1]) k = 1; else if (!slots[0]) k = 0;
+    slots[k] = { id: o.id, t: { rot: 0, flip: 0, dr: 0, dc: 0 } }; selSlot = k;
+    Snd.place(); renderShelf(); renderSlots(); renderTools(); evaluate();
+  }
+  const objOf = s => objects.find(o => o.id === s.id);
+  const shapeOf = s => { const o = objOf(s); return o.kept ? o.b : C.transform(o.b, s.t); };
+
+  // ---------- 작업대 ----------
+  function renderOps() {
+    const el = $('opBox'); el.innerHTML = '';
+    tools.ops.forEach(k => { const b = document.createElement('button'); b.textContent = OP_LABEL[k]; if (k === op) b.classList.add('on'); b.addEventListener('click', () => { Snd.unlock(); op = k; Snd.op(); renderOps(); evaluate(); }); el.appendChild(b); });
+  }
+  function renderSlots() {
+    ['slotA', 'slotB'].forEach((id, k) => {
+      const el = $(id); const cv = el.querySelector('canvas'); prepCanvas(cv, 84); const s = slots[k];
+      el.classList.toggle('sel', selSlot === k);
+      drawBits(cv, s ? shapeOf(s) : null, { on: '#cfcac2' });
+      el.querySelector('.nm').textContent = s ? objOf(s).name : '';
+    });
+  }
+  ['slotA', 'slotB'].forEach((id, k) => $(id).addEventListener('click', () => { Snd.unlock(); selSlot = k; Snd.tap(); renderSlots(); renderTools(); }));
+  function renderTools() {
+    const el = $('tools'); el.innerHTML = '';
+    const s = slots[selSlot]; const keptSel = s && objOf(s).kept;
+    const mk = (label, fn, dis) => { const b = document.createElement('button'); b.textContent = label; b.disabled = !!dis; b.addEventListener('click', () => { Snd.unlock(); fn(); }); el.appendChild(b); return b; };
+    if (tools.rot) mk('돌리기 ↻', () => xform(t => { t.rot = (t.rot + 1) % 4; }), !s || keptSel);
+    if (tools.flip) mk('뒤집기 ⇋', () => xform(t => { t.flip = t.flip ? 0 : 1; }), !s || keptSel);
+    if (tools.shift) { [['←', 0, -1], ['→', 0, 1], ['↑', -1, 0], ['↓', 1, 0]].forEach(([l, dr, dc]) => mk(l, () => xform(t => { t.dr += dr; t.dc += dc; }), !s || keptSel)); }
+    mk('비우기', () => { if (!s) return; slots[selSlot] = null; Snd.tap(); renderShelf(); renderSlots(); renderTools(); evaluate(); }, !s);
+    if (tools.chain) { const b = mk('간직하기 ✦', keepResult, !(lastResult && !C.isEmpty(lastResult)) || keptCount >= 3); b.id = 'keep'; b.classList.add('primary'); }
+  }
+  function xform(fn) {
+    const s = slots[selSlot]; if (!s) return; const o = objOf(s); if (o.kept) return;
+    const t = Object.assign({}, s.t); fn(t);
+    if (t.dr) t.dr = Math.max(-3, Math.min(3, t.dr)); if (t.dc) t.dc = Math.max(-3, Math.min(3, t.dc));
+    const nb = C.transform(o.b, t);
+    if (C.count(nb) !== C.count(o.b)) { $('slots').classList.remove('shake'); void $('slots').offsetWidth; $('slots').classList.add('shake'); setMsg('사물은 판 밖으로 나가지 않는다.'); Snd.wrong(); return; }
+    s.t = t; Snd.op(); renderSlots(); evaluate();
+  }
+  function keepResult() {
+    if (!lastResult || C.isEmpty(lastResult) || keptCount >= 3) return;
+    keptCount++; const id = 'k' + keptCount;
+    objects.push({ id, name: '간직 ' + keptCount, b: lastResult, kept: true });
+    Snd.place(); setMsg('모양을 간직했다. 탁자 위에 새 사물이 놓였다.'); renderShelf(); renderTools();
+  }
+  const dotsEl = $('dots'); for (let i = 0; i < 7; i++) dotsEl.appendChild(document.createElement('i'));
+  function renderBoard(b, jamo) {
+    const cv = $('boardCv'); prepCanvas(cv, 280);
+    if (!b) { drawBits(cv, null); return; }
+    drawBits(cv, b, { on: jamo ? '#f6c976' : '#e8a94a', glow: true });
+  }
+  function evaluate() {
+    const A = slots[0] && shapeOf(slots[0]), B = slots[1] && shapeOf(slots[1]);
+    const dots = [...dotsEl.children];
+    if (!A || !B) { lastResult = null; renderBoard(A || B ? (A || B) : null); if (A || B) { const cv = $('boardCv'); drawBits(cv, A || B, { on: 'rgba(216,213,207,.35)' }); } dots.forEach(d => d.classList.remove('on')); renderTools(); return; }
+    const r = C.OPS[op](A, B); lastResult = r;
+    const j = C.recognize(r);
+    renderBoard(r, !!j);
+    const near = C.isEmpty(r) ? 99 : C.nearest(r).d; const lit = j ? 7 : Math.max(0, 7 - near);
+    dots.forEach((d, i) => d.classList.toggle('on', i < lit));
+    renderTools();
+    if (j) {
+      const bd = $('board'); bd.classList.remove('flash'); void bd.offsetWidth; bd.classList.add('flash'); setTimeout(() => bd.classList.remove('flash'), 900);
+      if (!found.includes(j)) { found.push(j); Snd.found(); setMsg(`빛이 「${j}」 모양으로 통과했다.`, 'good'); renderTray(j); }
+      else { Snd.again(); }
+    }
+  }
+
+  // ---------- 노트 ----------
+  function renderPrev() {
+    const el = $('prev'); el.innerHTML = '';
+    const from = Math.max(0, L.n - 4);
+    for (let i = from; i < L.n - 1; i++) { const d = document.createElement('div'); d.textContent = `${i + 1}. ` + STORY[i].replace(/【|】/g, ''); el.appendChild(d); }
+  }
+  function renderNote() {
+    const el = $('line'); el.innerHTML = '';
+    const pre = document.createElement('span'); pre.textContent = `${L.n}. `; pre.style.color = 'var(--ink3)'; el.appendChild(pre);
+    L.segs.forEach(seg => {
+      if (seg.t !== undefined) { el.appendChild(document.createTextNode(seg.t)); return; }
+      const bi = seg.blank, bl = L.blanks[bi], f = fills[bi];
+      const s = document.createElement('span'); s.className = 'syl';
+      const parts = bl.t ? 3 : 2;
+      for (let k = 0; k < parts; k++) {
+        const c = document.createElement('span'); c.className = 'js'; c.textContent = f[k] || '';
+        if (selCell && selCell.bi === bi && selCell.k === k) c.classList.add('sel');
+        c.addEventListener('click', e => { e.stopPropagation(); Snd.unlock(); Snd.tap(); onCell(bi, k); });
+        s.appendChild(c);
+      }
+      const full = f[0] && f[1] && (parts === 2 || f[2]); if (full) s.classList.add('ok');
+      el.appendChild(s);
+    });
+    renderTray();
+  }
+  function renderTray(newJ) {
+    const el = $('tray'); el.innerHTML = '';
+    found.forEach(j => { const d = document.createElement('div'); d.className = 'jm' + (selJamo === j ? ' sel' : '') + (j === newJ ? ' new' : ''); d.textContent = j; d.addEventListener('click', () => { Snd.unlock(); Snd.tap(); onJamo(j); }); el.appendChild(d); });
+    if (!found.length) { const d = document.createElement('div'); d.className = 'small'; d.textContent = '찾은 글자가 여기에 모인다.'; el.appendChild(d); }
+  }
+  const cellAccepts = (k, j) => k === 1 ? C.VOWELS.includes(j) : C.CONSONANTS.includes(j);
+  function onJamo(j) {
+    if (selCell) { if (cellAccepts(selCell.k, j)) { fills[selCell.bi][selCell.k] = j; selCell = nextCell(selCell); } else { Snd.wrong(); setMsg(selCell.k === 1 ? '가운데 칸에는 모음이 들어간다.' : '그 칸에는 자음이 들어간다.', 'bad'); }
+      renderNote(); return; }
+    selJamo = selJamo === j ? null : j; renderTray();
+  }
+  function onCell(bi, k) {
+    if (selJamo) { if (cellAccepts(k, selJamo)) { fills[bi][k] = selJamo; selJamo = null; } else { Snd.wrong(); setMsg(k === 1 ? '가운데 칸에는 모음이 들어간다.' : '그 칸에는 자음이 들어간다.', 'bad'); } renderNote(); return; }
+    if (fills[bi][k]) { fills[bi][k] = null; selCell = null; renderNote(); return; }
+    selCell = (selCell && selCell.bi === bi && selCell.k === k) ? null : { bi, k }; renderNote();
+  }
+  function nextCell(cur) { // 같은 글자 안에서 다음 빈 칸
+    const parts = L.blanks[cur.bi].t ? 3 : 2;
+    for (let k = cur.k + 1; k < parts; k++) if (!fills[cur.bi][k]) return { bi: cur.bi, k };
+    for (let bi = cur.bi + 1; bi < L.blanks.length; bi++) { const p = L.blanks[bi].t ? 3 : 2; for (let k = 0; k < p; k++) if (!fills[bi][k]) return { bi, k }; }
+    return null;
+  }
+  $('clearBtn').addEventListener('click', () => { Snd.unlock(); Snd.tap(); fills = L.blanks.map(b => [null, null, b.t ? null : '']); selCell = null; selJamo = null; renderNote(); setMsg(''); });
+  $('decodeBtn').addEventListener('click', () => { Snd.unlock(); decode(); });
+  function decode() {
+    let empty = 0, wrong = 0;
+    L.blanks.forEach((bl, i) => { const f = fills[i]; const parts = bl.t ? 3 : 2; if (!f[0] || !f[1] || (parts === 3 && !f[2])) { empty++; return; } const ch = C.compose(f[0], f[1], parts === 3 ? f[2] : ''); if (ch !== bl.ch) wrong++; });
+    if (empty) { setMsg(`아직 빈 칸이 ${empty}글자 있다.`, 'bad'); Snd.wrong(); return; }
+    if (wrong) { setMsg(`${wrong}글자가 아직 안개 속에 있다.`, 'bad'); Snd.wrong(); const el = $('line'); el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); return; }
+    // 해독 성공
+    Snd.clear(); setMsg('안개가 걷혔다.', 'good');
+    [...document.querySelectorAll('.syl')].forEach((s, i) => { s.className = 'syl done'; s.textContent = L.blanks[i].ch; });
+    save.cleared = Math.max(save.cleared, L.n); persist();
+    if (!window.__fog || window.__fog.auto !== false) setTimeout(() => { const next = L.n + 1; if (SCENES[L.n]) showScene(L.n, () => { if (next <= 30) loadStage(next); else showStart(true); }); else if (next <= 30) loadStage(next); }, 1600);
+  }
+  function setMsg(t, cls) { const m = $('msg'); m.textContent = t; m.className = cls || ''; }
+
+  // ---------- 힌트 ----------
+  $('hintBtn').addEventListener('click', () => {
+    Snd.unlock(); Snd.tap();
+    const missing = L.req.filter(j => !found.includes(j));
+    if (!missing.length) { setMsg('필요한 글자는 이미 다 찾았다. 노트를 채워 보자.'); return; }
+    if (hintsUsed >= 3) { setMsg('등불의 기름이 모자라다. 힌트는 단계마다 세 번뿐이다.', 'bad'); return; }
+    hintsUsed++; save.hints[L.n] = (save.hints[L.n] || 0) + 1; persist();
+    const j = missing[Math.floor(Math.random() * missing.length)]; const r = L.recipes[j];
+    let t;
+    if (r.chain) t = `「${j}」는 간직한 모양이 필요하다. 「${r.chain.a}」와 「${r.chain.b2}」로 만든 모양에 「${r.c}」를 ${OP_LABEL[r.op].split(' ')[0]}.`;
+    else { const objs = r.a === r.b ? `「${r.a}」 두 개` : `「${r.a}」와 「${r.b}」`; const tr = []; if (r.ta.rot || r.tb.rot) tr.push('돌리기'); if (r.ta.flip || r.tb.flip) tr.push('뒤집기'); if (r.ta.dr || r.ta.dc || r.tb.dr || r.tb.dc) tr.push('밀기'); t = `「${j}」: ${objs}를 ${OP_LABEL[r.op].split(' ')[0]}${tr.length ? ' (' + tr.join('·') + ' 필요)' : ''}.`; }
+    setMsg(`힌트 ${hintsUsed}/3 — ` + t, 'good');
+  });
+
+  // ---------- 장면 ----------
+  function drawScene(key) {
+    const art = D.art[key]; const cv = $('sceneCv'); if (!art) { cv.style.display = 'none'; return; } cv.style.display = 'block';
+    const W = art[0].length, H = art.length, px = 10; cv.width = W * px; cv.height = H * px; const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#0f1012'; ctx.fillRect(0, 0, cv.width, cv.height);
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) { const ch = art[r][c]; if (ch === '.') continue; ctx.fillStyle = ch === 'o' ? '#e8a94a' : ch === '+' ? '#3a3d44' : '#9a978f'; if (ch === 'o') { ctx.shadowColor = '#e8a94a'; ctx.shadowBlur = 12; } else ctx.shadowBlur = 0; ctx.fillRect(c * px + 1, r * px + 1, px - 2, px - 2); }
+    ctx.shadowBlur = 0;
+  }
+  function showScene(key, then) {
+    const sc = SCENES[key]; $('sceneTitle').textContent = sc.title; $('sceneText').innerHTML = sc.lines.map(l => l).join('<br>');
+    const te = $('sceneTeach'); if (sc.teach) { te.style.display = 'block'; te.textContent = sc.teach; } else te.style.display = 'none';
+    drawScene(key); $('scene').classList.add('show'); Snd.scene();
+    $('sceneBtn').onclick = () => { Snd.tap(); $('scene').classList.remove('show'); then && then(); };
+  }
+
+  // ---------- 화면 전환 ----------
+  function showStart(ending) {
+    $('app').classList.remove('show'); $('start').classList.add('show');
+    $('contBtn').style.display = save.cleared >= 1 && save.cleared < 30 ? '' : 'none';
+    if (ending) { $('startBtn').textContent = '다시 처음부터'; }
+  }
+  function begin(fromStage) {
+    $('start').classList.remove('show'); $('app').classList.add('show');
+    if (fromStage === 1) showScene(0, () => loadStage(1)); else loadStage(fromStage);
+  }
+  $('startBtn').addEventListener('click', () => { Snd.unlock(); Snd.tap(); save.cleared = 0; save.hints = {}; persist(); begin(1); });
+  $('contBtn').addEventListener('click', () => { Snd.unlock(); Snd.tap(); begin(Math.min(30, save.cleared + 1)); });
+  const goFull = () => { const el = document.documentElement; const f = el.requestFullscreen || el.webkitRequestFullscreen; if (f) { try { const p = f.call(el); if (p && p.then) p.then(() => { try { screen.orientation.lock('landscape').catch(() => { }); } catch (e) { } }).catch(() => { }); } catch (e) { } } };
+  $('fsBtn').addEventListener('click', goFull); $('fsBtn2').addEventListener('click', goFull);
+  $('soundBtn').addEventListener('click', () => { Snd.unlock(); const on = Snd.toggle(); $('soundBtn').classList.toggle('on', !on); $('soundBtn').textContent = on ? '소리' : '소리 꺼짐'; });
+  if (save.sound === false) { $('soundBtn').classList.add('on'); $('soundBtn').textContent = '소리 꺼짐'; }
+  $('menuBtn').addEventListener('click', () => { Snd.tap(); $('menuInfo').textContent = `${L.n}단계 · ${act}막 ${ACT_NAMES[act]} · 힌트 ${hintsUsed}/3`; $('howText').style.display = 'none'; $('menu').classList.add('show'); });
+  $('resumeBtn').addEventListener('click', () => { Snd.tap(); $('menu').classList.remove('show'); });
+  $('restartStageBtn').addEventListener('click', () => { Snd.tap(); $('menu').classList.remove('show'); loadStage(L.n); });
+  $('resetBtn').addEventListener('click', () => { Snd.tap(); $('menu').classList.remove('show'); save.cleared = 0; save.hints = {}; persist(); showStart(); $('startBtn').textContent = '처음부터'; });
+  $('howBtn').addEventListener('click', () => { const h = $('howText'); h.style.display = h.style.display === 'none' ? 'block' : 'none'; h.innerHTML = ['<b>규칙</b> 탁자 위의 물건을 앞·뒤 자리에 올리면 빛판에 모양이 찍힌다. 그 모양이 한글 자모와 정확히 같으면(자리는 상관없다) 노트의 쟁반에 들어온다. 쟁반의 자모로 일기의 빈 글자를 채우고 「해독」을 누른다. 문장 전체가 맞아야 안개가 걷힌다.', '<b>비추기 ∩</b> 두 사물이 모두 뚫린 곳만 남는다. <b>겹치기 ∪</b> 두 모양을 합친다. <b>파내기 −</b> 앞 사물에서 뒤 사물의 모양을 도려낸다.', '<b>돌리기·뒤집기·밀기</b> 선택한 자리의 사물을 바꾼다. 사물은 판 밖으로 나가지 않는다. <b>간직하기</b> 빛판의 모양을 새 사물로 만든다(단계마다 셋). 간직한 모양은 돌리거나 밀 수 없다.', '점 일곱 개는 가장 가까운 글자까지 남은 칸 수를 알려 준다. 힌트는 단계마다 세 번.'].join('<br><br>'); });
+
+
+  // 검증용 훅 (자동 풀이 테스트)
+  window.__fog = {
+    load: loadStage,
+    place(name, k, t) { const o = objects.find(x => x.name === name); if (!o) throw new Error('no obj ' + name); slots[k] = { id: o.id, t: Object.assign({ rot: 0, flip: 0, dr: 0, dc: 0 }, t || {}) }; selSlot = k; renderShelf(); renderSlots(); renderTools(); evaluate(); },
+    setOp(k) { op = k; renderOps(); evaluate(); },
+    keep: keepResult,
+    fill(bi, k, j) { fills[bi][k] = j; renderNote(); },
+    decode,
+    state() { return { n: L.n, found: found.slice(), req: L.req.slice(), blanks: L.blanks, msg: $('msg').textContent, kept: keptCount }; },
+  };
+  // 진행 상황
+  if (save.cleared >= 30) $('startBtn').textContent = '다시 처음부터';
+  showStart(false);
+})();
+
+</script>
+</body>
+</html>
