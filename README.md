@@ -24,7 +24,7 @@
 
 ## BGM — 수노(Suno)로 만들어 넣기
 
-`bgm/` 폴더에 아래 이름의 mp3를 넣으면 그 곡이 흐른다. 없으면 브라우저가 합성한 대체음이 나온다. 모두 **가사 없는 연주곡(instrumental)**, 2~3분, 반복 재생 전제.
+`bgm/` 폴더의 곡 여덟 개는 수노로 만들었다. 앞뒤 빈 소리와 끝의 페이드를 잘라 내고 끝과 처음을 4초 겹쳐 이어서, 반복될 때 끊기지 않는다. 소리 크기는 모두 -18 LUFS로 맞췄다(112kbps mp3). 곡이 없으면 브라우저가 합성한 대체음이 나온다. 모두 **가사 없는 연주곡(instrumental)**.
 
 | 파일 | 쓰이는 곳 | 수노 프롬프트 제안 |
 |---|---|---|
@@ -36,6 +36,10 @@
 | `bgm/lighthouse.mp3` | 5장 등대 | solemn cinematic noir, solo cello, wind, slow build, revelation, instrumental |
 | `bgm/ending_a.mp3` | 결말 A (장부를 넘긴다) | bitter noir jazz ballad, lonely trumpet, rain on window, resignation, instrumental |
 | `bgm/ending_b.mp3` | 결말 B (등불에 태운다) | melancholic but hopeful noir, piano and strings, dawn over the sea, instrumental |
+
+## 타자기 소리
+
+자막을 칠 때의 글쇠·띄어쓰기·줄 끝 종·캐리지 소리는 Pixabay의 실제 수동 타자기 녹음(Pixabay Content License)에서 잘라 `tools/tw.js`에 한 파일로 담았다. 녹음을 쓸 수 없는 브라우저에서는 합성 소리로 대신한다.
 
 ## 만드는 방식
 
