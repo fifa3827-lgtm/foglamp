@@ -1344,15 +1344,15 @@ button.ghost{border-color:transparent;background:none;color:var(--dim)}
 
   // =====================================================================
   // 10. 등대 꼭대기 — 렌즈 틀의 점무늬 필름 + 성냥갑 속 필름 = 한 장의 글 → 도현
-  //     「아빠는 살아 있어 / 배에서 기다려」. 아빠 — 서연은 도현의 딸이다.
+  //     「아빠는 살아 있어 / 배에서 기다려 / — ㄷㅎ」. 끝의 서명 ㄷㅎ(5방 사진 뒷면과 같은 서명)이 쓴 사람을, 「아빠」가 받는 사람과의 관계를 말한다.
   // =====================================================================
   (() => {
-    const CELL = 5, NX = 72, NY = 40; const AX = 810, AY = 300; const FW = NX * CELL, FH = NY * CELL;
+    const CELL = 5, NX = 72, NY = 56; const AX = 810, AY = 300; const FW = NX * CELL, FH = NY * CELL;
     let shares = null;
     const build = () => {
       const sc = document.createElement('canvas'); sc.width = NX; sc.height = NY; const x = sc.getContext('2d');
-      const m1 = A.textMask('아빠는 살아 있어', 64, { weight: 800, font: FONT.title }), m2 = A.textMask('배에서 기다려', 64, { weight: 800, font: FONT.title });
-      x.drawImage(m1, 1, 1, NX - 2, NY / 2 - 1); x.drawImage(m2, 6, NY / 2, NX - 12, NY / 2 - 1); const d = x.getImageData(0, 0, NX, NY).data;
+      const m1 = A.textMask('아빠는 살아 있어', 64, { weight: 800, font: FONT.title }), m2 = A.textMask('배에서 기다려', 64, { weight: 800, font: FONT.title }), m3 = A.textMask('— ㄷㅎ', 64, { weight: 800, font: FONT.title });
+      x.drawImage(m1, 1, 1, NX - 2, 19); x.drawImage(m2, 6, 20, NX - 12, 19); x.drawImage(m3, NX - 46, 39, 44, 16); const d = x.getImageData(0, 0, NX, NY).data;
       let s = 77; const r = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
       const ca = document.createElement('canvas'), cb = document.createElement('canvas'); ca.width = cb.width = FW; ca.height = cb.height = FH; const xa = ca.getContext('2d'), xb = cb.getContext('2d'); xa.fillStyle = xb.fillStyle = '#000';
       const h = CELL / 2; const put = (ctx, cx, cy, p) => { if (p === 0) { ctx.fillRect(cx, cy, h, h); ctx.fillRect(cx + h, cy + h, h, h); } else { ctx.fillRect(cx + h, cy, h, h); ctx.fillRect(cx, cy + h, h, h); } };
@@ -1371,9 +1371,9 @@ button.ghost{border-color:transparent;background:none;color:var(--dim)}
         { id: 'filmB', x: 520, y: 610, z: 6, hidden: true, rotatable: true, rotStep: 1, rotSnap: 0, wheelStep: 1, ringR: 150, hw: FW / 2 + 8, hh: FH / 2 + 8, draw: (c, g) => { ensure(); filmDraw(c, shares.b, g.sel && g.sel.id === 'filmB'); },
           onDrop: (o, g) => { if (Math.abs(o.x - AX) < 7 && Math.abs(o.y - AY) < 7 && rotErr(o.rot, 0) < 3) { o.x = AX; o.y = AY; o.rot = 0; g.Snd.metal(); } } },
       ],
-      facts: [{ id: 'f10', text: '두 필름을 겹치자 떠오른 글: 아빠는 살아 있어 / 배에서 기다려', when: g => err(g) < 2.5 }],
+      facts: [{ id: 'f10', text: '두 필름을 겹치자 떠오른 글: 아빠는 살아 있어 / 배에서 기다려 / — ㄷㅎ', when: g => err(g) < 2.5 }],
       init(g) { ensure(); g.objById('matchbox').opened = false; },
-      hints: ['한 장만으로는 점뿐이다. 다른 반쪽은 처음부터 가지고 있었다.', '성냥갑을 연다. 필름을 렌즈 틀의 필름 위에 정확히 — 각도는 1도씩.', '「아빠」 — 서연은 누구의 딸인가.'],
+      hints: ['한 장만으로는 점뿐이다. 다른 반쪽은 처음부터 가지고 있었다.', '성냥갑을 연다. 필름을 렌즈 틀의 필름 위에 정확히 — 각도는 1도씩.', '끝의 서명 「ㄷㅎ」은 호텔 방 사진 뒷면에서 본 것과 같다. 그 사람이 자기를 「아빠」라고 부른다.'],
       bg(c) { wall(c, '#050607'); },
       under(c) { ensure(); c.save(); c.translate(AX, AY); c.fillStyle = 'rgba(235,228,210,.55)'; c.fillRect(-FW / 2 - 8, -FH / 2 - 8, FW + 16, FH + 16); filmDraw(c, shares.a, false); c.restore(); },
       solve: g => { const mb = g.objById('matchbox'); mb.onTap(mb, g); const f = g.objById('filmB'); f.x = AX; f.y = AY; f.rot = 0; },
