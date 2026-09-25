@@ -365,8 +365,9 @@ button.ghost{border-color:transparent;background:none;color:var(--dim)}
     const bell = (f, t, vol, dur) => { const e = echo(); const g = ctx.createGain(); g.connect(sfxGain); g.connect(e); [[1, 1], [2.4, .45], [4.1, .2], [6.8, .08]].forEach(([m, a]) => tone(f * m, 'sine', t, dur / (1 + m * 0.35), vol * a, g)); };
     const noise = (t, dur, vol, hp, lp) => { const o = ctx.createBufferSource(); o.buffer = noiseBuf(); const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); let n = o; if (hp) { const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp; n.connect(f); n = f; } if (lp) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; n.connect(f); n = f; } n.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + dur + 0.1); };
     const api = {
+      bgmState() { return bgmEl ? { key: bgmKey, paused: bgmEl.paused, t: +bgmEl.currentTime.toFixed(1), vol: +bgmEl.volume.toFixed(2) } : { key: bgmKey, synth: !!synthBgm }; },
       twReady() { return tw ? { dur: tw.duration, sr: tw.sampleRate, shift: +twShift.toFixed(4) } : null; },
-      unlock() { ensure(); if (ctx.state === 'suspended') ctx.resume(); },
+      unlock() { ensure(); if (ctx.state === 'suspended') ctx.resume(); if (bgmEl && bgmEl.paused && bgmKey) bgmEl.play().catch(() => { }); }, // 첫 손길 전에 막혔던 음악을 다시 튼다
       isOn() { return on; }, setOn(v) { on = !!v; if (ctx) master.gain.value = on ? 1 : 0; if (bgmEl) bgmEl.muted = !on; },
       toggle() { on = !on; if (ctx) master.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 0.05); if (bgmEl) bgmEl.muted = !on; return on; },
       rain(level) { if (!ctx) return; if (!rainNode) { rainNode = ctx.createBufferSource(); rainNode.buffer = noiseBuf(); rainNode.loop = true; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.4; const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 500; rainGain = ctx.createGain(); rainGain.gain.value = 0; rainNode.connect(hp); hp.connect(bp); bp.connect(rainGain); rainGain.connect(master); rainNode.start(); } rainGain.gain.setTargetAtTime(level * 0.05, ctx.currentTime, 1.2); },
@@ -433,6 +434,8 @@ button.ghost{border-color:transparent;background:none;color:var(--dim)}
     fx: { rain: 0.6 },
 
     init() {
+      // 휴대폰은 손가락이 닿는 순간에만 소리를 허락한다 — 어디를 누르든 소리와 음악을 깨운다
+      document.addEventListener('pointerdown', () => Snd.unlock(), true);
       this.cv = $('cv'); this.ctx = this.cv.getContext('2d');
       this.makeGrain(); this.resize(); root.addEventListener('resize', () => this.resize());
       this.bindInput(); this.bindUI();
